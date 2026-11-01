@@ -10910,9 +10910,6 @@ printf "%s\n" "yes" >&6; }
 
 fi
 
-if test "x$DOS32" != "x1"
-then :
-
 
 pkg_failed=no
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for ogg" >&5
@@ -11534,17 +11531,6 @@ else
 	VORBISFILE_LIBS=$pkg_cv_VORBISFILE_LIBS
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
-
-fi
-
-else $as_nop
-
-	OGG_CFLAGS=
-	OGG_LIBS=
-	VORBIS_CFLAGS=
-	VORBIS_LIBS=
-	VORBISFILE_CFLAGS=
-	VORBISFILE_LIBS=
 
 fi
 

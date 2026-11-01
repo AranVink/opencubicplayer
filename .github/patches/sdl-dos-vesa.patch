@@ -1,0 +1,258 @@
+diff --git a/src/video/dos/SDL_dosframebuffer.c b/src/video/dos/SDL_dosframebuffer.c
+index e77234110..3be15350f 100644
+--- a/src/video/dos/SDL_dosframebuffer.c
++++ b/src/video/dos/SDL_dosframebuffer.c
+@@ -277,7 +277,7 @@ bool DOSVESA_CreateWindowFramebuffer(SDL_VideoDevice *device, SDL_Window *window
+         // Check if we have any usable VRAM access path (banked or LFB).
+         bool have_vram = false;
+ 
+-        if (mdata->win_a_segment && mdata->win_size > 0 &&
++        if (mdata->win_a_segment && mdata->win_granularity > 0 && mdata->win_size > 0 &&
+             (mdata->win_a_attributes & VBE_WINATTR_USABLE) == VBE_WINATTR_USABLE) {
+             // Banked window available. Use dosmemput path (preferred).
+             have_vram = true;
+@@ -315,7 +315,7 @@ bool DOSVESA_CreateWindowFramebuffer(SDL_VideoDevice *device, SDL_Window *window
+             // opted into the direct-FB hint for maximum throughput, and
+             // games like Quake never used page flipping for their software
+             // renderers anyway.
+-            if (mdata->win_a_segment && mdata->win_size > 0 &&
++            if (mdata->win_a_segment && mdata->win_granularity > 0 && mdata->win_size > 0 &&
+                 (mdata->win_a_attributes & VBE_WINATTR_USABLE) == VBE_WINATTR_USABLE) {
+                 Uint32 win_bytes = (Uint32)mdata->win_size * 1024;
+                 fb_state.use_dosmemput = true;
+@@ -398,6 +398,9 @@ SDL_FORCE_INLINE void BankedDosmemput(const Uint8 *src, Uint32 total_bytes, Uint
+                                       int *current_bank)
+ {
+     Uint32 src_off = 0;
++    if (!win_gran_bytes || win_size_bytes < win_gran_bytes) {
++        return;
++    }
+     while (total_bytes > 0) {
+         int bank = (int)(dst_offset / win_gran_bytes);
+         Uint32 off_in_win = dst_offset % win_gran_bytes;
+@@ -459,10 +462,8 @@ static void BankedFramebufferCopyRect(const SDL_DisplayModeData *mdata,
+ static void WaitForVBlank(void)
+ {
+     while (inportb(VGA_STATUS_PORT) & VGA_STATUS_VBLANK) {
+-        SDL_CPUPauseInstruction();
+     }
+     while (!(inportb(VGA_STATUS_PORT) & VGA_STATUS_VBLANK)) {
+-        SDL_CPUPauseInstruction();
+     }
+ }
+ 
+@@ -798,6 +799,9 @@ bool DOSVESA_UpdateWindowFramebuffer(SDL_VideoDevice *device, SDL_Window *window
+         // Bank-switched copy of only the dirty rectangles.
+         // Pre-compute constants shared across all rect copies.
+         const Uint32 win_gran_bytes = (Uint32)mdata->win_granularity * 1024;
++        if (!win_gran_bytes) {
++            return SDL_SetError("DOSVESA: banked mode has zero window granularity");
++        }
+         const Uint32 win_size_bytes = (Uint32)mdata->win_size * 1024;
+         const Uint32 win_base = (Uint32)mdata->win_a_segment << 4;
+         int current_bank = -1;
+diff --git a/src/video/dos/SDL_dosmodes.c b/src/video/dos/SDL_dosmodes.c
+index d3cb94efc..37cf2ee6c 100644
+--- a/src/video/dos/SDL_dosmodes.c
++++ b/src/video/dos/SDL_dosmodes.c
+@@ -117,7 +117,19 @@ typedef struct SDL_VESAModeHardwareInfo
+     Uint32 PhysBasePtr;
+     Uint32 OffScreenMemOffset;
+     Uint16 OffScreenMemSize;
+-    Uint8 Reserved[206];
++    Uint16 LinBytesPerScanLine;
++    Uint8 BnkNumberOfImagePages;
++    Uint8 LinNumberOfImagePages;
++    Uint8 LinRedMaskSize;
++    Uint8 LinRedFieldPosition;
++    Uint8 LinGreenMaskSize;
++    Uint8 LinGreenFieldPosition;
++    Uint8 LinBlueMaskSize;
++    Uint8 LinBlueFieldPosition;
++    Uint8 LinReservedMaskSize;
++    Uint8 LinReservedFieldPosition;
++    Uint32 MaxPixelClock;
++    Uint8 Reserved[190];
+ } SDL_VESAModeHardwareInfo;
+ #pragma pack(pop)
+ 
+@@ -137,6 +149,14 @@ typedef struct SDL_VESAInfo
+ 
+ static SDL_VESAInfo *vesa_info = NULL;
+ 
++static void SetCurrentMode(SDL_VideoData *data, const SDL_DisplayMode *mode, Uint16 pitch)
++{
++    SDL_copyp(&data->current_mode, mode);
++    SDL_copyp(&data->current_mode_data, (const SDL_DisplayModeData *)mode->internal);
++    data->current_mode_data.pitch = pitch;
++    data->current_mode.internal = &data->current_mode_data;
++}
++
+ void DOSVESA_FreeVESAInfo(void)
+ {
+     if (vesa_info) {
+@@ -292,7 +312,8 @@ static bool GetVESAModeInfo(Uint16 mode_id, SDL_DisplayModeData *info)
+         SDL_zerop(info);
+         info->mode_id = mode_id;
+         info->attributes = hwinfo->ModeAttributes;
+-        info->pitch = hwinfo->BytesPerScanLine;
++        info->banked_pitch = hwinfo->BytesPerScanLine;
++        info->pitch = info->banked_pitch;
+         info->w = hwinfo->XResolution;
+         info->h = hwinfo->YResolution;
+         info->num_planes = hwinfo->NumberOfPlanes;
+@@ -309,6 +330,31 @@ static bool GetVESAModeInfo(Uint16 mode_id, SDL_DisplayModeData *info)
+ 
+         // VBE 1.2 banked framebuffer fields
+         info->has_lfb = (hwinfo->ModeAttributes & VBE_MODEATTR_LFB) != 0;
++        info->linear_pitch = hwinfo->BytesPerScanLine;
++        info->linear_red_mask_size = hwinfo->RedMaskSize;
++        info->linear_red_mask_pos = hwinfo->RedMaskPos;
++        info->linear_green_mask_size = hwinfo->GreenMaskSize;
++        info->linear_green_mask_pos = hwinfo->GreenMaskPos;
++        info->linear_blue_mask_size = hwinfo->BlueMaskSize;
++        info->linear_blue_mask_pos = hwinfo->BlueMaskPos;
++        const SDL_VESAInfo *vesa = GetVESAInfo();
++        if (vesa && vesa->version >= 0x300 && info->has_lfb && hwinfo->LinBytesPerScanLine) {
++            info->pitch = hwinfo->LinBytesPerScanLine;
++            info->linear_pitch = hwinfo->LinBytesPerScanLine;
++            info->num_image_pages = hwinfo->LinNumberOfImagePages;
++            info->linear_red_mask_size = hwinfo->LinRedMaskSize;
++            info->linear_red_mask_pos = hwinfo->LinRedFieldPosition;
++            info->linear_green_mask_size = hwinfo->LinGreenMaskSize;
++            info->linear_green_mask_pos = hwinfo->LinGreenFieldPosition;
++            info->linear_blue_mask_size = hwinfo->LinBlueMaskSize;
++            info->linear_blue_mask_pos = hwinfo->LinBlueFieldPosition;
++            info->red_mask_size = hwinfo->LinRedMaskSize;
++            info->red_mask_pos = hwinfo->LinRedFieldPosition;
++            info->green_mask_size = hwinfo->LinGreenMaskSize;
++            info->green_mask_pos = hwinfo->LinGreenFieldPosition;
++            info->blue_mask_size = hwinfo->LinBlueMaskSize;
++            info->blue_mask_pos = hwinfo->LinBlueFieldPosition;
++        }
+         info->win_granularity = hwinfo->WinGranularity;
+         info->win_size = hwinfo->WinSize;
+         info->win_a_segment = hwinfo->WinASegment;
+@@ -358,7 +404,7 @@ bool DOSVESA_GetDisplayModes(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_disp
+             continue; // skip anything below 8-bit.
+         } else if (!info.w || !info.h) {
+             continue; // zero-area display mode?!
+-        } else if (!info.has_lfb && !info.win_granularity) {
++        } else if (!info.has_lfb && (!info.win_granularity || !info.win_size)) {
+             continue; // banked mode with zero granularity would cause division by zero.
+         } else if ((info.memory_model != VBE_MEMMODEL_PACKED_PIXEL) && (info.memory_model != VBE_MEMMODEL_DIRECT_COLOR)) {
+             continue; // must be either packed pixel or Direct Color.
+@@ -433,6 +479,8 @@ bool DOSVESA_GetDisplayModes(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_disp
+             internal->mode_id = VGA_MODE_13H_SENTINEL;
+             internal->attributes = VBE_MODEATTR_REQUIRED;
+             internal->pitch = 320;
++            internal->banked_pitch = 320;
++            internal->linear_pitch = 320;
+             internal->w = 320;
+             internal->h = 200;
+             internal->num_planes = 1;
+@@ -516,7 +564,7 @@ bool DOSVESA_SetDisplayMode(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_displ
+ 
+         data->banked_mode = true; // uses A000:0000 segment, no LFB
+ 
+-        SDL_copyp(&data->current_mode, mode);
++        SetCurrentMode(data, mode, modedata->banked_pitch);
+ 
+         data->page_flip_available = false;
+         data->current_page = 0;
+@@ -551,10 +599,12 @@ bool DOSVESA_SetDisplayMode(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_displ
+     // When the direct-FB hint is active, prefer banked mode. This needs
+     // to be set explicitly for some cards (Intel 740).
+     const bool is_banked_usable = modedata->win_a_segment &&
++                                  modedata->win_granularity > 0 &&
+                                   modedata->win_size > 0 &&
+                                   (modedata->win_a_attributes & VBE_WINATTR_USABLE) == VBE_WINATTR_USABLE;
+     const bool use_lfb = modedata->has_lfb &&
+                          (!is_banked_usable || !SDL_GetHintBoolean(SDL_HINT_DOS_ALLOW_DIRECT_FRAMEBUFFER, false));
++    const Uint16 pitch = use_lfb ? modedata->linear_pitch : modedata->banked_pitch;
+ 
+     regs.x.ax = 0x4F02;
+     regs.x.bx = modedata->mode_id | (use_lfb ? VBE_SETMODE_LFB : 0);
+@@ -578,11 +628,14 @@ bool DOSVESA_SetDisplayMode(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_displ
+         }
+ 
+         // make sure framebuffer is blanked out.
+-        SDL_memset(DOS_PhysicalToLinear(data->mapping.address), '\0', (Uint32)modedata->h * (Uint32)modedata->pitch);
++        SDL_memset(DOS_PhysicalToLinear(data->mapping.address), '\0', (Uint32)modedata->h * pitch);
+     } else {
+         // Banked mode: no physical address mapping needed.
+         // Blank the visible framebuffer through the banked window.
+-        Uint32 total_bytes = (Uint32)modedata->h * (Uint32)modedata->pitch;
++        if (!modedata->win_granularity || !modedata->win_size) {
++            return SDL_SetError("Failed to set banked VESA mode with invalid window geometry");
++        }
++        Uint32 total_bytes = (Uint32)modedata->h * pitch;
+         Uint32 win_gran_bytes = (Uint32)modedata->win_granularity * 1024;
+         Uint32 win_size_bytes = (Uint32)modedata->win_size * 1024;
+         Uint32 win_base = (Uint32)modedata->win_a_segment << 4;
+@@ -630,7 +683,7 @@ bool DOSVESA_SetDisplayMode(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_displ
+         }
+     }
+ 
+-    SDL_copyp(&data->current_mode, mode);
++    SetCurrentMode(data, mode, pitch);
+ 
+     // Set up page-flipping if the mode has at least 1 image page (meaning 2 total)
+     // Note: page-flipping is only supported with LFB modes. With banked modes,
+@@ -641,17 +694,17 @@ bool DOSVESA_SetDisplayMode(SDL_VideoDevice *device, SDL_VideoDisplay *sdl_displ
+         data->page_flip_available = true;
+         data->current_page = 0;
+         data->page_offset[0] = 0;
+-        data->page_offset[1] = (Uint32)modedata->pitch * (Uint32)modedata->h;
++        data->page_offset[1] = (Uint32)pitch * (Uint32)modedata->h;
+ 
+         // Check that both pages fit within the mapped region.
+-        Uint32 page1_end = data->page_offset[1] + (Uint32)modedata->pitch * (Uint32)modedata->h;
++        Uint32 page1_end = data->page_offset[1] + (Uint32)pitch * (Uint32)modedata->h;
+         if (page1_end > data->mapping.size) {
+             data->page_flip_available = false;
+             data->page_offset[1] = 0;
+         } else {
+             // Also blank the second page
+             SDL_memset((Uint8 *)DOS_PhysicalToLinear(data->mapping.address) + data->page_offset[1],
+-                       '\0', (Uint32)modedata->pitch * (Uint32)modedata->h);
++                       '\0', (Uint32)pitch * (Uint32)modedata->h);
+ 
+             // Start display at page 0
+             regs.x.ax = 0x4F07;
+diff --git a/src/video/dos/SDL_dosvideo.h b/src/video/dos/SDL_dosvideo.h
+index c5646e9d8..aaedead5e 100644
+--- a/src/video/dos/SDL_dosvideo.h
++++ b/src/video/dos/SDL_dosvideo.h
+@@ -32,6 +32,7 @@ struct SDL_DisplayModeData
+     Uint16 mode_id;
+     Uint16 attributes;
+     Uint16 pitch;
++    Uint16 banked_pitch;
+     Uint16 w;
+     Uint16 h;
+     Uint8 num_planes;
+@@ -46,6 +47,15 @@ struct SDL_DisplayModeData
+     Uint8 blue_mask_pos;
+     Uint32 physical_base_addr;
+ 
++    // VBE 3.0 linear framebuffer channel layout
++    Uint8 linear_red_mask_size;
++    Uint8 linear_red_mask_pos;
++    Uint8 linear_green_mask_size;
++    Uint8 linear_green_mask_pos;
++    Uint8 linear_blue_mask_size;
++    Uint8 linear_blue_mask_pos;
++    Uint16 linear_pitch;
++
+     // VBE 1.2 banked framebuffer fields (used when LFB is not available)
+     bool has_lfb;           // true if linear framebuffer is available (VBE 2.0+)
+     Uint16 win_granularity; // bank positioning granularity in KB
+@@ -64,6 +74,7 @@ struct SDL_VideoData
+     Uint16 original_vbe_mode;     // VBE mode number at startup
+     void *vbe_state_buffer;       // saved VBE state (from VBE 0x4F04)
+     Uint32 vbe_state_buffer_size; // size of the state buffer
++    SDL_DisplayModeData current_mode_data; // selected banked or linear pitch
+ 
+     // Mouse sensitivity (mickeys per pixel), queried from INT 33h function 0x1B
+     float mickeys_per_hpixel; // horizontal mickeys per pixel (default: 8)

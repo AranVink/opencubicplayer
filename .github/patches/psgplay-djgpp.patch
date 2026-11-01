@@ -1,0 +1,45 @@
+diff --git a/include/m68k/m68k.h b/include/m68k/m68k.h
+index 903224b..40506d2 100644
+--- a/include/m68k/m68k.h
++++ b/include/m68k/m68k.h
+@@ -8,6 +8,8 @@
+ #ifndef M68K__HEADER
+ #define M68K__HEADER
+ 
++#include <stdint.h>
++
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -158,9 +160,9 @@ struct m68k_module;
+  */
+ 
+ /* Read from anywhere */
+-unsigned int  m68k_read_memory_8(struct m68k_module *module, unsigned int address);
+-unsigned int  m68k_read_memory_16(struct m68k_module *module, unsigned int address);
+-unsigned int  m68k_read_memory_32(struct m68k_module *module, unsigned int address);
++uint32_t m68k_read_memory_8(struct m68k_module *module, uint32_t address);
++uint32_t m68k_read_memory_16(struct m68k_module *module, uint32_t address);
++uint32_t m68k_read_memory_32(struct m68k_module *module, uint32_t address);
+ 
+ /* Read data immediately following the PC */
+ unsigned int  m68k_read_immediate_16(struct m68k_module *module, unsigned int address);
+@@ -173,13 +175,13 @@ unsigned int  m68k_read_pcrelative_32(struct m68k_module *module, unsigned int a
+ 
+ /* Memory access for the disassembler */
+ unsigned int m68k_read_disassembler_8  (struct m68k_module *module, unsigned int address);
+-unsigned int m68k_read_disassembler_16 (struct m68k_module *module, unsigned int address);
+-unsigned int m68k_read_disassembler_32 (struct m68k_module *module, unsigned int address);
++uint32_t m68k_read_disassembler_16 (struct m68k_module *module, uint32_t address);
++uint32_t m68k_read_disassembler_32 (struct m68k_module *module, uint32_t address);
+ 
+ /* Write to anywhere */
+-void m68k_write_memory_8(struct m68k_module *module, unsigned int address, unsigned int value);
+-void m68k_write_memory_16(struct m68k_module *module, unsigned int address, unsigned int value);
+-void m68k_write_memory_32(struct m68k_module *module, unsigned int address, unsigned int value);
++void m68k_write_memory_8(struct m68k_module *module, uint32_t address, uint32_t value);
++void m68k_write_memory_16(struct m68k_module *module, uint32_t address, uint32_t value);
++void m68k_write_memory_32(struct m68k_module *module, uint32_t address, uint32_t value);
+ 
+ /* Special call to simulate undocumented 68k behavior when move.l with a
+  * predecrement destination mode is executed.

@@ -69,6 +69,10 @@ dumpmidi$(EXE_SUFFIX): dumpmidi.o
 
 CFLAGS+= -Itimidity-git/interface -Itimidity-git/libarc -Itimidity-git/libunimod -Itimidity-git/timidity -Itimidity-git/utils -I. -DHAVE_CONFIG_H
 
+ifeq ($(DOS32),1)
+timidity-git/libarc/url_dir.o: CFLAGS += -Uunix
+endif
+
 %.o: \
 	%.c \
 	../config.h \
@@ -134,6 +138,7 @@ timidity_obj=\
 #	timidity-git/timidity/playmidi.o
 
 utils_obj=\
+	timidity-git/utils/getopt.o \
 	timidity-git/utils/mblock.o \
 	timidity-git/utils/fft4g.o \
 	timidity-git/utils/memb.o \

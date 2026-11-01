@@ -497,7 +497,7 @@ PKG_CHECK_MODULES([LIBJPEG],[libjpeg],[AS_ECHO("libjpeg flags ... $LIBJPEG_CFLAG
 
 PKG_CHECK_MODULES([LIBPNG],[libpng],[],[AC_MSG_ERROR([failed to find libpng])])
 
-AS_IF([test "x$DOS32" != "x1"], [
+dnl Ogg/Vorbis are required for host and DOS builds.
 	PKG_CHECK_MODULES([OGG],[ogg],[],[
 	dnl Fall back to non-pkg-config method
 		AC_CHECK_LIB([ogg], [ogg_sync_init], [], [AC_MSG_ERROR([ogg libraries not found])])
@@ -525,14 +525,6 @@ AS_IF([test "x$DOS32" != "x1"], [
 		VORBISFILE_CFLAGS=""
 		LIBS=$push_LIBS
 	])
-], [
-	OGG_CFLAGS=
-	OGG_LIBS=
-	VORBIS_CFLAGS=
-	VORBIS_LIBS=
-	VORBISFILE_CFLAGS=
-	VORBISFILE_LIBS=
-])
 AC_SUBST(OGG_CFLAGS)
 AC_SUBST(OGG_LIBS)
 AC_SUBST(VORBIS_CFLAGS)

@@ -5,6 +5,10 @@ TARGETS=playsndh$(LIB_SUFFIX)
 
 CFLAGS+=-fPIC
 
+ifeq ($(DOS32),1)
+SNDH_MUSTPROVIDE_ICE=1
+endif
+
 all: $(TARGETS)
 
 clean:

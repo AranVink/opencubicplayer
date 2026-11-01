@@ -10,22 +10,26 @@ the installed card. The default configuration selects SDL3 audio and an
 Use the DJGPP cross compiler (normally `i586-pc-msdosdjgpp-*`) and a matching
 static SDL3 build. SDL3 must be built with its DOS backend and available
 through the cross `pkg-config` setup. The target dependency libraries used by
-the existing build are also required: FreeType, zlib, bzip2, libjpeg, and
-libpng. No shared libraries or runtime plugin directory are used. The DOS
+the build are also required: FreeType, zlib, bzip2, libjpeg, libpng, libogg,
+and libvorbis. No shared libraries or runtime plugin directory are used. The DOS
 build does not depend on libiconv: its interface uses built-in UTF-8/CP437
 conversion, ZIP filenames use CP437, and other archive filenames are used as
 stored without charset conversion. The archive charset override selector is
 disabled.
-The reduced DOS build does not include Ogg/Vorbis playback and does not check
-for libogg, libvorbis, or libvorbisfile.
 
-The DOS player sources for AdPlug and SID are Git submodules. Initialize them
-before configuring:
+The DOS player sources for AdPlug, QOA, SID, SNDH, and TiMidity are Git
+submodules. Initialize them and apply the DJGPP compatibility patches before
+configuring:
 
 ```sh
 git submodule update --init --recursive \
   playopl/adplug-git playopl/libbinio-git \
-  playsid/libsidplayfp-git playsid/libresidfp-git
+  playqoa/qoa-git \
+  playsid/libsidplayfp-git playsid/libresidfp-git \
+  playsndh/psgplay-git \
+  playtimidity/timidity-git
+git -C playsid/libresidfp-git apply "$PWD/.github/patches/residfp-djgpp.patch"
+git -C playsndh/psgplay-git apply "$PWD/.github/patches/psgplay-djgpp.patch"
 ```
 
 The SID build also needs `xa` (the 6502 assembler), `hexdump`, and Perl on the
@@ -36,15 +40,14 @@ build host. AdPlug's RetroWave external hardware interface is not built for DOS.
 `.github/workflows/dos.yml` cross-builds the DOS dependencies and `ocp.exe`,
 then runs a startup smoke test under DOSEMU and uploads the executable, config,
 and test log as an Actions artifact. The smoke test confirms file-selector and
-Sound Blaster initialization. It currently reports the known SDL DOS video
-`SIGFPE` as a warning, so a green workflow is not yet proof that the interface
-or sustained playback works.
+Sound Blaster initialization and fails if OpenCP reports a CPU exception. It
+does not visually verify the interface or test sustained playback.
 
 ## Dependency sources and DJGPP builds
 
-These are the upstream Git repositories used for the DOS dependencies. Clone
-them under `~/dev` (or update an existing checkout to the revision you intend
-to build):
+These are the upstream Git repositories used for the DOS dependencies. From
+the OpenCP repository root, clone them under `~/dev` (or update an existing
+clean checkout to the revision you intend to build):
 
 ```sh
 git clone https://github.com/libsdl-org/SDL.git ~/dev/SDL
@@ -53,7 +56,11 @@ git clone https://github.com/libarchive/bzip2.git ~/dev/bzip2
 git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git ~/dev/libjpeg
 git clone https://github.com/pnggroup/libpng.git ~/dev/libpng
 git clone https://github.com/freetype/freetype.git ~/dev/freetype
+git clone https://github.com/xiph/ogg.git ~/dev/ogg
+git clone https://github.com/xiph/vorbis.git ~/dev/vorbis
 git clone https://github.com/roboticslibrary/libiconv.git ~/dev/libiconv
+git -C ~/dev/SDL apply "$PWD/.github/patches/sdl-dos-vesa.patch"
+git -C ~/dev/ogg apply "$PWD/.github/patches/ogg-djgpp.patch"
 ```
 
 The DOS build does not use libiconv. The checkout at
@@ -115,6 +122,13 @@ cmake_djgpp "$HOME/dev/freetype" \
   -DFT_REQUIRE_ZLIB=ON -DFT_REQUIRE_BZIP2=ON -DFT_REQUIRE_PNG=ON \
   -DFT_DISABLE_HARFBUZZ=ON -DFT_DISABLE_BROTLI=ON -DFT_DISABLE_HVF=ON \
   -DBUILD_SHARED_LIBS=OFF
+cmake_djgpp "$HOME/dev/ogg" \
+  -DBUILD_SHARED_LIBS=OFF -DINSTALL_DOCS=OFF
+cmake_djgpp "$HOME/dev/vorbis" \
+  -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF \
+  -DOGG_ROOT="$PREFIX" \
+  -DOGG_LIBRARY="$PREFIX/lib/libogg.a" \
+  -DOGG_INCLUDE_DIR="$PREFIX/include"
 cmake_djgpp "$HOME/dev/SDL" \
   -DSDL_SHARED=OFF -DSDL_STATIC=ON \
   -DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_EXAMPLES=OFF
@@ -165,14 +179,13 @@ This increases playback latency; adjust `plrbufsize` in `ocp.ini` if needed.
 
 Run under DOS with a DPMI host available (for example `CWSDPMI.EXE`) and a
 correct `BLASTER` setting. SDL3's DOS audio driver reads the Sound Blaster
-configuration from that environment variable. The SDL3 video backend uses
-VGA graphics and can use VESA modes when available; the 80x25 interface is
-rendered by SDL rather than written to the BIOS text screen, so VESA is not a
-runtime requirement for the basic display.
+configuration from that environment variable. The SDL3 DOS video backend can
+use VESA modes when available, including VBE 3.0 linear framebuffer pitch,
+color-mask, and image-page information. The 80x25 interface is rendered by
+SDL rather than written to the BIOS text screen, so VESA is not a runtime
+requirement for the basic display.
 
-The target includes AdPlug OPL, AY, GMD, HVL/AHX, IT, SID, WAV, XM, and YM
-playback. It does not include dynamic plugins, CD audio, external process
-execution, MusicBrainz lookups, or Ancient-based compressed-module decoding.
-Other codec players require libraries not present in the DOS dependency
-prefix, while several additional bundled players need uninitialized or
-incomplete Git submodules.
+The target includes AdPlug OPL, AY, GMD, HVL/AHX, IT, Ogg/Vorbis, QOA, SID,
+SNDH, TiMidity MIDI, WAV, XM, and YM playback. It does not include dynamic
+plugins, CD audio, external process execution, MusicBrainz lookups, or
+Ancient-based compressed-module decoding.

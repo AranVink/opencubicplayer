@@ -2,9 +2,10 @@
 
 ## Runtime blockers and validation
 
-- [ ] Diagnose and fix the SDL3 DOS video `SIGFPE` seen under `dosemu -dumb
-  ocp.exe` during VESA framebuffer updates. Verify startup reaches a usable
-  80x25 interface; also check VGA-only operation and optional VESA modes.
+- [ ] Verify a usable 80x25 interface under DOSEMU and real DOS hardware, and
+  exercise both VGA-only operation and optional VESA modes. The current
+  `dosemu -dumb ocp.exe` smoke run remains active until timeout without a
+  reported CPU exception, but does not visually confirm the display.
 - [ ] Verify sustained Sound Blaster 16 playback under DOSEMU and, if possible,
   real DOS hardware. Test WAV playback past the earlier `read failed #14`
   report, check for choppiness, and tune the current 500 ms player buffer and
@@ -16,11 +17,9 @@
 
 ## Playback formats and compatibility
 
-- [ ] Audit additional player modules and codec dependencies for DOS
+- [ ] Audit the remaining player modules and codec dependencies for DOS
   compatibility, then add only those that can be built and statically linked
-  reliably. Candidates previously left out include Ogg/Vorbis and bundled
-  QOA, SNDH, and TiMidity players; Ogg/Vorbis was intentionally excluded
-  earlier.
+  reliably. The DOS target now includes Ogg/Vorbis, QOA, SNDH, and TiMidity.
 - [ ] Keep the supported-format list and the documented limitations in
   [README-DOS.md](./README-DOS.md) aligned with the executable and runtime
   tests.

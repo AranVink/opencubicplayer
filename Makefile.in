@@ -2,7 +2,7 @@ TOPDIR=./
 include $(TOPDIR)Rules.make
 
 ifeq ($(DOS32),1)
-SUBDIRS=boot cpiface dev devp devw filesel help medialib playay playgmd playhvl playit playopl playsid playwav playxm playym stuff
+SUBDIRS=boot cpiface dev devp devw filesel help medialib playay playgmd playhvl playit playogg playopl playqoa playsid playsndh playtimidity playwav playxm playym stuff
 else
 SUBDIRS=boot cpiface dev doc devp devw filesel goodies help medialib playay playcda playflac playgmd playtimidity playhvl playit playogg playopl playsndh playqoa plugins
 ifeq ($(HAVE_MAD),1)
@@ -47,7 +47,7 @@ libocp_so+=$(STATIC_OBJECTS)
 endif
 
 ifeq ($(DOS32),1)
-DOS_PLUGIN_MODULES=devp/devpsdl3$(LIB_SUFFIX) devw/devwmix$(LIB_SUFFIX) devw/devwnone$(LIB_SUFFIX) playay/playay$(LIB_SUFFIX) playgmd/playgmd$(LIB_SUFFIX) playhvl/playhvl$(LIB_SUFFIX) playit/playit$(LIB_SUFFIX) playopl/playopl$(LIB_SUFFIX) playsid/playsid$(LIB_SUFFIX) playwav/playwav$(LIB_SUFFIX) playxm/playxm$(LIB_SUFFIX) playym/playym$(LIB_SUFFIX)
+DOS_PLUGIN_MODULES=devp/devpsdl3$(LIB_SUFFIX) devw/devwmix$(LIB_SUFFIX) devw/devwnone$(LIB_SUFFIX) playay/playay$(LIB_SUFFIX) playgmd/playgmd$(LIB_SUFFIX) playhvl/playhvl$(LIB_SUFFIX) playit/playit$(LIB_SUFFIX) playogg/playogg$(LIB_SUFFIX) playopl/playopl$(LIB_SUFFIX) playqoa/playqoa$(LIB_SUFFIX) playsid/playsid$(LIB_SUFFIX) playsndh/playsndh$(LIB_SUFFIX) playtimidity/playtimidity$(LIB_SUFFIX) playwav/playwav$(LIB_SUFFIX) playxm/playxm$(LIB_SUFFIX) playym/playym$(LIB_SUFFIX)
 all: subdirs libocp$(LIB_SUFFIX) ocp$(EXE_SUFFIX)
 else
 all: subdirs ocp$(EXE_SUFFIX) ocp.hlp libocp$(LIB_SUFFIX)
@@ -169,7 +169,7 @@ ocp$(EXE_SUFFIX): boot libocp$(LIB_SUFFIX) subdirs
 	mv playgmd/playgmd$(LIB_SUFFIX).tmp playgmd/playgmd$(LIB_SUFFIX)
 	$(host)-objcopy --redefine-sym _mod=_xm_module playxm/playxm$(LIB_SUFFIX) playxm/playxm$(LIB_SUFFIX).tmp
 	mv playxm/playxm$(LIB_SUFFIX).tmp playxm/playxm$(LIB_SUFFIX)
-	$(CXX) $(LDFLAGS) -o $@ boot/kickload.o libocp$(LIB_SUFFIX) $(DOS_PLUGIN_MODULES) boot/plugin-list-end.o $(SDL3_LIBS) $(MATH_LIBS) -lz -lbz2
+	$(CXX) $(LDFLAGS) -o $@ boot/kickload.o libocp$(LIB_SUFFIX) $(DOS_PLUGIN_MODULES) boot/plugin-list-end.o $(SDL3_LIBS) $(VORBISFILE_LIBS) $(VORBIS_LIBS) $(OGG_LIBS) $(LIBJPEG_LIBS) $(LIBPNG_LIBS) $(MATH_LIBS) -lz -lbz2
 else
 ocp$(EXE_SUFFIX): boot
 	$(CC) $(LDFLAGS) -o $@ $(OCP_OBJECTS) @DL_LIBS@ @EFENCE_LIBS@ @DUMA_LIBS@

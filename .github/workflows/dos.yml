@@ -18,7 +18,10 @@ jobs:
         run: |
           git submodule update --init --recursive \
             playopl/adplug-git playopl/libbinio-git \
-            playsid/libsidplayfp-git playsid/libresidfp-git
+            playqoa/qoa-git \
+            playsid/libsidplayfp-git playsid/libresidfp-git \
+            playsndh/psgplay-git \
+            playtimidity/timidity-git
 
       - name: Install build and DOS test tools
         run: |
@@ -58,6 +61,10 @@ jobs:
           git clone --depth 1 https://github.com/libjpeg-turbo/libjpeg-turbo.git "$SOURCES/libjpeg"
           git clone --depth 1 https://github.com/pnggroup/libpng.git "$SOURCES/libpng"
           git clone --depth 1 https://github.com/freetype/freetype.git "$SOURCES/freetype"
+          git clone --depth 1 https://github.com/xiph/ogg.git "$SOURCES/ogg"
+          git clone --depth 1 https://github.com/xiph/vorbis.git "$SOURCES/vorbis"
+          git -C "$SOURCES/SDL" apply "$GITHUB_WORKSPACE/.github/patches/sdl-dos-vesa.patch"
+          git -C "$SOURCES/ogg" apply "$GITHUB_WORKSPACE/.github/patches/ogg-djgpp.patch"
 
           cmake_djgpp() {
             local source="$1"
@@ -101,6 +108,13 @@ jobs:
             -DFT_REQUIRE_ZLIB=ON -DFT_REQUIRE_BZIP2=ON -DFT_REQUIRE_PNG=ON \
             -DFT_DISABLE_HARFBUZZ=ON -DFT_DISABLE_BROTLI=ON -DFT_DISABLE_HVF=ON \
             -DBUILD_SHARED_LIBS=OFF
+          cmake_djgpp "$SOURCES/ogg" \
+            -DBUILD_SHARED_LIBS=OFF -DINSTALL_DOCS=OFF
+          cmake_djgpp "$SOURCES/vorbis" \
+            -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF \
+            -DOGG_ROOT="$PREFIX" \
+            -DOGG_LIBRARY="$PREFIX/lib/libogg.a" \
+            -DOGG_INCLUDE_DIR="$PREFIX/include"
           cmake_djgpp "$SOURCES/SDL" \
             -DSDL_SHARED=OFF -DSDL_STATIC=ON \
             -DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_EXAMPLES=OFF
@@ -109,6 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           git -C playsid/libresidfp-git apply "$GITHUB_WORKSPACE/.github/patches/residfp-djgpp.patch"
+          git -C playsndh/psgplay-git apply "$GITHUB_WORKSPACE/.github/patches/psgplay-djgpp.patch"
           autoconf
           export PATH="/usr/local/djgpp/bin:$PATH"
           export PKG_CONFIG_LIBDIR="$RUNNER_TEMP/djgpp-deps/lib/pkgconfig"
@@ -124,6 +139,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          for module in \
+            playogg/playogg.rel playqoa/playqoa.rel playsndh/playsndh.rel \
+            playtimidity/playtimidity.rel; do
+            test -s "$module"
+          done
           wget -q https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7b.zip
           unzip -j -o csdpmi7b.zip "bin/CWSDPMI.EXE" -d .
           set +e
@@ -134,8 +154,9 @@ jobs:
           grep -Fq "initializing fileselector" dosemu.log
           grep -Fq "[SDL] Using audio driver soundblaster" dosemu.log
           grep -Fq "devpSDL3: SDL 3.x Player" dosemu.log
-          if grep -Fq "Exiting due to signal SIGFPE" dosemu.log; then
-            echo "::warning::OCP reaches Sound Blaster initialization, but the known SDL DOS video SIGFPE still occurs."
+          if grep -Eq "Exiting due to signal SIG[A-Z]+" dosemu.log; then
+            echo "OpenCP crashed under DOSEMU:"
+            exit 1
           elif [[ "$status" -ne 0 && "$status" -ne 124 ]]; then
             echo "DOSEMU exited unexpectedly with status $status"
             exit "$status"
