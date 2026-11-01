@@ -31,6 +31,15 @@ git submodule update --init --recursive \
 The SID build also needs `xa` (the 6502 assembler), `hexdump`, and Perl on the
 build host. AdPlug's RetroWave external hardware interface is not built for DOS.
 
+## GitHub Actions
+
+`.github/workflows/dos.yml` cross-builds the DOS dependencies and `ocp.exe`,
+then runs a startup smoke test under DOSEMU and uploads the executable, config,
+and test log as an Actions artifact. The smoke test confirms file-selector and
+Sound Blaster initialization. It currently reports the known SDL DOS video
+`SIGFPE` as a warning, so a green workflow is not yet proof that the interface
+or sustained playback works.
+
 ## Dependency sources and DJGPP builds
 
 These are the upstream Git repositories used for the DOS dependencies. Clone

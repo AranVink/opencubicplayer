@@ -1,0 +1,34 @@
+diff --git a/src/resample/PassThrough.h b/src/resample/PassThrough.h
+index 7394457..465ffb0 100644
+--- a/src/resample/PassThrough.h
++++ b/src/resample/PassThrough.h
+@@ -41,14 +41,14 @@ public:
+     PassThrough() :
+         outputValue(0) {}
+ 
+-    bool input(int sample) override
++    bool input(int32_t sample) override
+     {
+         outputValue = sample;
+ 
+         return true;
+     }
+ 
+-    int output() const override { return outputValue; }
++    int32_t output() const override { return outputValue; }
+ 
+     void reset() override
+     {
+diff --git a/src/resample/ZeroOrderResampler.h b/src/resample/ZeroOrderResampler.h
+index cbc2afd..e1c6833 100644
+--- a/src/resample/ZeroOrderResampler.h
++++ b/src/resample/ZeroOrderResampler.h
+@@ -57,7 +57,7 @@ public:
+         sampleOffset(0),
+         outputValue(0) {}
+ 
+-    bool input(int sample) override
++    bool input(int32_t sample) override
+     {
+         bool ready = false;
+ 
