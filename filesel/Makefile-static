@@ -10,7 +10,6 @@ cphlpfs.o                     \
 dirdb.o                       \
 download.o                    \
 filesystem.o                  \
-filesystem-ancient.o          \
 filesystem-bzip2.o            \
 filesystem-dir-mem.o          \
 filesystem-drive.o            \
@@ -31,9 +30,14 @@ filesystem-zip.o              \
 fsptype.o                     \
 mdb.o                         \
 modlist.o                     \
-musicbrainz.o                 \
 pfilesel.o                    \
 pfsmain.o
+
+ifeq ($(DOS32),1)
+pfilesel_so += filesystem-ancient-dos.o
+else
+pfilesel_so += filesystem-ancient.o musicbrainz.o
+endif
 
 ifeq ($(WINDOWS),1)
 pfilesel_so += filesystem-windows.o

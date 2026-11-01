@@ -7,6 +7,9 @@ UTF_O=utf-8.o utf-16.o
 endif
 
 all: $(boot_libocp_start_so) $(boot_libocp_so) kickload.o $(UTF_O)
+ifeq ($(DOS32),1)
+all: plugin-list-end.o
+endif
 
 clean:
 	rm -f *.o *.a *$(LIB_SUFFIX)
@@ -44,7 +47,9 @@ plinkman.o: plinkman.c plinkman.h \
 	../stuff/utf-16.h
 	$(CC) plinkman.c -o $@ -c
 
-ifeq ($(WINDOWS),1)
+ifeq ($(DOS32),1)
+KICKLOAD_C=kickload-dos.c
+else ifeq ($(WINDOWS),1)
 KICKLOAD_C=kickload-windows.c
 else
 KICKLOAD_C=kickload-unix.c
@@ -58,6 +63,11 @@ kickload.o: $(KICKLOAD_C) \
 	../stuff/poutput.h \
 	../stuff/utf-16.h \
 	../Rules.make
+	$(CC) $< -o $@ -c
+
+plugin-list-end.o: plugin-list-end.c \
+	../config.h \
+	plinkman.h
 	$(CC) $< -o $@ -c
 
 console.o: console.c console.h \

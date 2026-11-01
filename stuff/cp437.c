@@ -19,16 +19,20 @@
  */
 
 #include "config.h"
+#ifndef DOS32
 #include <errno.h>
 #include <iconv.h>
 #include <stdio.h>
+#endif
 #include <string.h>
 #include "types.h"
 #include "cp437.h"
 #include "utf-8.h"
 
+#ifndef DOS32
 static iconv_t to_cp437_from_utf8 = (iconv_t)(-1);
 static iconv_t from_cp437_to_utf8 = (iconv_t)(-1);
+#endif
 
 /* table to convert codepage 437 into Unicode (UTF-8) */
 const uint32_t ocp_cp437_to_unicode[256] =
@@ -79,6 +83,37 @@ const uint16_t cp437_to_unicode[256] =
 
 void utf8_to_cp437(const char *src, size_t srclen, char *dst, size_t dstlen)
 {
+#ifdef DOS32
+	while (*src && srclen && dstlen > 1)
+	{
+		int length = 0;
+		uint32_t codepoint = utf8_decode (src, srclen, &length);
+		unsigned int i;
+		unsigned char converted = '?';
+
+		if (codepoint > 0 && codepoint <= 0x7e)
+		{
+			converted = codepoint;
+		} else {
+			for (i = 0; i < 256; i++)
+			{
+				if (cp437_to_unicode[i] == codepoint)
+				{
+					converted = i;
+					break;
+				}
+			}
+		}
+		*dst++ = converted;
+		dstlen--;
+		src += length;
+		srclen -= length;
+	}
+	if (dstlen)
+	{
+		*dst = 0;
+	}
+#else
 	if (to_cp437_from_utf8 != (iconv_t)(-1))
 	{
 		while (*src && srclen && dstlen)
@@ -114,6 +149,7 @@ void utf8_to_cp437(const char *src, size_t srclen, char *dst, size_t dstlen)
 	{
 		iconv (to_cp437_from_utf8, 0, 0, 0, 0);
 	}
+#endif
 }
 
 void cp437_f_to_utf8_z(const char *src, size_t srclen, char *dst, size_t dstlen)
@@ -127,6 +163,22 @@ void cp437_f_to_utf8_z(const char *src, size_t srclen, char *dst, size_t dstlen)
 	{
 		return;
 	}
+#ifdef DOS32
+	dstlen--;
+	while (*src && srclen && dstlen)
+	{
+		uint32_t codepoint = cp437_to_unicode[(unsigned char)*src++];
+		int length = utf8_encoded_length (codepoint);
+		if ((size_t)length > dstlen)
+		{
+			break;
+		}
+		dst += utf8_encode (dst, codepoint);
+		dstlen -= length;
+		srclen--;
+	}
+	*dst = 0;
+#else
 	dstlen--;
 	if (from_cp437_to_utf8 != (iconv_t)(-1))
 	{
@@ -158,11 +210,13 @@ void cp437_f_to_utf8_z(const char *src, size_t srclen, char *dst, size_t dstlen)
 	{
 		iconv (from_cp437_to_utf8, 0, 0, 0, 0);
 	}
+#endif
 }
 
 
 void  __attribute__((constructor)) cp437_charset_init(void)
 {
+#ifndef DOS32
 	to_cp437_from_utf8 = iconv_open(OCP_FONT "//TRANSLIT", "UTF-8");
 	if (to_cp437_from_utf8==(iconv_t)(-1))
 	{
@@ -210,10 +264,12 @@ void  __attribute__((constructor)) cp437_charset_init(void)
 			}
 		}
 	}
+#endif
 }
 
 void  __attribute__((destructor)) cp437_charset_done(void)
 {
+#ifndef DOS32
 	if (to_cp437_from_utf8 != (iconv_t)(-1))
 	{
 		iconv_close(to_cp437_from_utf8);
@@ -225,4 +281,5 @@ void  __attribute__((destructor)) cp437_charset_done(void)
 		iconv_close(from_cp437_to_utf8);
 		from_cp437_to_utf8 = (iconv_t)(-1);
 	}
+#endif
 }

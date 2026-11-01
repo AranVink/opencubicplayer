@@ -21,6 +21,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include "adplug-git/src/adplug.h"
 #include "adplug-git/src/players.h"
@@ -41,6 +42,14 @@ extern "C" {
 #include "stuff/err.h"
 }
 #include "opltype.h"
+
+#ifdef __DJGPP__
+extern "C"
+{
+int strcasecmp(const char *, const char *);
+char *strupr(char *);
+}
+#endif
 
 static int oplReadInfo(struct moduleinfostruct *m, struct ocpfilehandle_t *f, const char *buf, size_t len, const struct mdbReadInfoAPI_t *API)
 {

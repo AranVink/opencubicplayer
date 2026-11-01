@@ -52,8 +52,13 @@ devpsdl2$(LIB_SUFFIX):$(devpsdl2_so)
 	$(CC) $(SHARED_FLAGS) -o $@ $^ $(SDL2_LIBS)
 
 devpsdl3_so=devpsdl3.o
-devpsdl3$(LIB_SUFFIX):$(devpsdl3_so)
+ifeq ($(DOS32),1)
+devpsdl3$(LIB_SUFFIX): $(devpsdl3_so)
+	$(CC) $(SHARED_FLAGS) -o $@ $^
+else
+devpsdl3$(LIB_SUFFIX): $(devpsdl3_so)
 	$(CC) $(SHARED_FLAGS) -o $@ $^ $(SDL3_LIBS)
+endif
 
 clean:
 	rm -f *.o *$(LIB_SUFFIX)

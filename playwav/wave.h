@@ -15,7 +15,7 @@ struct waveinfo
 struct ocpfilehandle_t;
 struct cpifaceSessionAPI_t;
 
-OCP_INTERNAL unsigned char wpOpenPlayer (struct ocpfilehandle_t *fp, struct cpifaceSessionAPI_t *cpifaceSession);
+OCP_INTERNAL int wpOpenPlayer (struct ocpfilehandle_t *fp, struct cpifaceSessionAPI_t *cpifaceSession);
 OCP_INTERNAL void wpClosePlayer (struct cpifaceSessionAPI_t *cpifaceSession);
 OCP_INTERNAL void wpIdle (struct cpifaceSessionAPI_t *cpifaceSession);
 OCP_INTERNAL void wpSetLoop (unsigned char s);

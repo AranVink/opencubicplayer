@@ -27,6 +27,9 @@
 #include "types.h"
 #include <sys/time.h>
 #include <unistd.h>
+#ifdef DOS32
+# include <SDL3/SDL_timer.h>
+#endif
 #include "boot/plinkman.h"
 #include "boot/psetting.h"
 #include "filesel/pfilesel.h"
@@ -43,6 +46,23 @@ int fsFPSCurrent=0;
 
 static struct timeval targetFPS = {0, 0};
 static struct timeval targetAudioPoll = {0, 0};
+
+#ifdef DOS32
+static void framelock_sleep(unsigned usec)
+{
+	while (usec >= 1000)
+	{
+		SDL_Delay(1);
+		usec -= 1000;
+	}
+	SDL_Delay(0);
+}
+#else
+static void framelock_sleep(unsigned usec)
+{
+	usleep(usec);
+}
+#endif
 
 OCP_INTERNAL void framelock_init (void)
 {
@@ -100,13 +120,13 @@ rerun:
 		tmTimerHandler (pollTypeVideo);
 		if (curr.tv_usec<targetFPS.tv_usec)
 		{
-			usleep(targetFPS.tv_usec-curr.tv_usec);
+			framelock_sleep(targetFPS.tv_usec-curr.tv_usec);
 		}
 		targetFPS.tv_usec+=1000000/fsFPS;
 	} else {
 		if (curr.tv_usec < targetAudioPoll.tv_usec)
 		{
-			usleep(targetAudioPoll.tv_usec-curr.tv_usec);
+			framelock_sleep(targetAudioPoll.tv_usec-curr.tv_usec);
 		}
 		goto rerun;
 	}

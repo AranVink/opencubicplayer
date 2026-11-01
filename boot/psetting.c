@@ -736,7 +736,7 @@ int cfGetConfig(int argc, char *argv[])
 
 	t=_cfGetProfileString("general", "tempdir", 0);
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(DOS32)
 	if (!t || !strlen (t))
 	{
 		t=getenv("TEMP");
@@ -751,6 +751,22 @@ int cfGetConfig(int argc, char *argv[])
 	}
 	cfTempPath = malloc (strlen (t) + 2);
 	sprintf (cfTempPath, "%s%s", t, (t[strlen(t) - 1] != '/') ? "/" : "");
+#elif defined(DOS32)
+	if (!t || !strlen (t))
+	{
+		t=getenv("TEMP");
+	}
+	if (!t || !strlen (t))
+	{
+		t=getenv("TMP");
+	}
+	if (!t || !strlen (t))
+	{
+		t = cfProgramPath;
+	}
+	cfTempPath = malloc (strlen (t) + 2);
+	sprintf (cfTempPath, "%s%s", t,
+		(t[strlen(t) - 1] != '/') && (t[strlen(t) - 1] != '\\') ? "\\" : "");
 #else
 	if (!t || !strlen (t))
 	{

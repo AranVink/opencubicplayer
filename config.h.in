@@ -459,6 +459,7 @@ static inline void *memmem(const void *_haystack, size_t haystacklen,
 
 #undef SUPPORT_STATIC_PLUGINS
 #undef STATIC_CORE
+#undef DOS32
 
 #undef HAVE_SYSCONF
 

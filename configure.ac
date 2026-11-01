@@ -12,16 +12,25 @@ AC_DEFINE([OCP_PATCH_VERSION], [PATCH_VERSION])
 
 AC_CANONICAL_HOST
 
-AC_MSG_CHECKING([GIT submodules are checked out])
-AS_IF([test -f playtimidity/timidity-git/Makefile.am],
-      [
-        AS_IF([test -f playqoa/qoa-git/qoa.h],
-              [AC_MSG_RESULT([ok])],
-              [AC_MSG_ERROR([playqoa/qoa-git is missing - please execute 'git submodule update --init --recursive'])]
-        )
-      ],
-      [AC_MSG_ERROR([playtimidity/timidity-git is missing - please execute 'git submodule update --init --recursive'])]
-)
+AS_CASE([$host],
+	[*-msdosdjgpp*],[
+		DOS32=1
+		AC_DEFINE([DOS32],[1],[Define for DJGPP DOS builds])
+	],
+	[])
+
+AS_IF([test "x$DOS32" != "x1"], [
+	AC_MSG_CHECKING([GIT submodules are checked out])
+	AS_IF([test -f playtimidity/timidity-git/Makefile.am],
+	      [
+	        AS_IF([test -f playqoa/qoa-git/qoa.h],
+	              [AC_MSG_RESULT([ok])],
+	              [AC_MSG_ERROR([playqoa/qoa-git is missing - please execute 'git submodule update --init --recursive'])]
+	        )
+	      ],
+	      [AC_MSG_ERROR([playtimidity/timidity-git is missing - please execute 'git submodule update --init --recursive'])]
+	)
+])
 
 AC_ARG_WITH([debug], [AS_HELP_STRING([--with-debug],[compile with debug-flags])])
 AS_IF([test "x$with_debug" = "xyes"], [
@@ -69,10 +78,18 @@ AC_SUBST(EXE_SUFFIX)
 AC_SUBST(PTHREAD_LIBS)
 AC_SUBST(HAIKU)
 AC_SUBST(WINDOWS)
+AC_SUBST(DOS32)
 AC_SUBST(WINDRES)
 DIRSEPARATOR="/"
 target=`$CC -dumpmachine`
 AS_CASE([$target],
+	[*-msdosdjgpp*],[
+		DOS32=1
+		SHARED_FLAGS=-r
+		LIB_SUFFIX=.rel
+		EXE_SUFFIX=.exe
+		PTHREAD_LIBS=
+	],
 	[*-darwin*],[
 		SHARED_FLAGS="-dynamiclib -undefined dynamic_lookup"
 		CFLAGS="$CFLAGS -fno-common"
@@ -110,7 +127,7 @@ AS_CASE([$target],
 )
 AC_DEFINE_UNQUOTED(LIB_SUFFIX, "$LIB_SUFFIX")
 
-AC_ARG_WITH([builtin],                 [AS_HELP_STRING([--with-builtin=core,auto,none],    [force/disable builtin plugins support. For now playback plugins, audio mixers and audio drivers are always modules])],
+AC_ARG_WITH([builtin],                 [AS_HELP_STRING([--with-builtin=core,auto,none],    [force/disable builtin plugins support])],
                                                                                                                                                                             [], [with_builtin=auto])
 AC_ARG_WITH([x11],                     [AS_HELP_STRING([--with-x11],                       [force/disable x11 support])],                                                   [], [with_x11=auto])
 AC_ARG_WITH([x11_shm],                 [AS_HELP_STRING([--with-x11-shm],                   [force/disable x11 SHM support])],                                               [], [with_x11_shm=auto])
@@ -201,6 +218,37 @@ dnl restore prefix and exec_prefix
   prefix=$prefix_save
   exec_prefix=$exec_prefix_save
 ])
+
+AS_IF([test "x$DOS32" = "x1"], [
+	AS_IF([test "x$with_sdl3" = "xauto"], [with_sdl3=yes])
+	AS_IF([test "x$with_sdl3" != "xyes"], [AC_MSG_ERROR([DJGPP DOS builds require SDL3])])
+	AC_DEFINE([NO_DLCLOSE], [1], [Do not unload static plugins])
+	with_sdl=no
+	with_sdl2=no
+	with_x11=no
+	with_x11_shm=no
+	with_alsa=no
+	with_oss=no
+	with_coreaudio=no
+	with_builtin=core
+	with_update_mime_database=no
+	with_desktop_file_install=no
+	with_update_desktop_database=no
+	OCP_PLAYERDEVICES="devpSDL3 devpDisk"
+	OCP_WAVETABLEDEVICES="devwMix devwNone"
+	OCP_SCREENTYPE=0
+	OCP_PLRBUFSIZE=500
+])
+AS_IF([test "x$DOS32" != "x1"], [
+	OCP_PLAYERDEVICES="devpALSA devpOSS devpCA devpSDL2 devpSDL devpNone devpDisk"
+	OCP_WAVETABLEDEVICES="devwMixF devwMixQ devwMix devwNone"
+	OCP_SCREENTYPE=5
+	OCP_PLRBUFSIZE=200
+])
+AC_SUBST(OCP_PLAYERDEVICES)
+AC_SUBST(OCP_WAVETABLEDEVICES)
+AC_SUBST(OCP_SCREENTYPE)
+AC_SUBST(OCP_PLRBUFSIZE)
 
 AC_SUBST(STATIC_BUILD)
 AC_SUBST(STATIC_CORE)
@@ -381,7 +429,7 @@ AC_DEFINE(TIMIDITYPKGDATADIR,TIMIDITY_DEFAULT_PATH,a compatibility matter. ignor
 
 dnl We first check for ncursesw, if that fails we revert back to ncurses
 AC_SUBST(HAVE_CURSES)
-AS_IF([test "x$WINDOWS" == x],
+AS_IF([test "x$WINDOWS" == x && test "x$DOS32" != "x1"],
   [
     AX_WITH_CURSES
     AS_IF([test "x$ax_cv_ncursesw" != xyes && test "x$ax_cv_ncurses" != xyes], [AC_MSG_ERROR([requires either NcursesW or Ncurses library])])
@@ -400,7 +448,7 @@ AC_CHECK_HEADER([zlib.h], [], [AC_MSG_ERROR([zlib header files was not found])])
 AC_CHECK_LIB([bz2], [BZ2_bzDecompress], [], [AC_MSG_ERROR([bzip2 library not found (libbz2-dev)])])
 AC_CHECK_HEADER([bzlib.h], [], [AC_MSG_ERROR([bzip2 header file not found (libbz2-dev)])])
 
-AS_IF([test "x$WINDOWS" == x],
+AS_IF([test "x$WINDOWS" == x && test "x$DOS32" != "x1"],
   [
 AC_SUBST(DL_LIBS)
 dnl -lc is dirty hack here
@@ -449,39 +497,48 @@ PKG_CHECK_MODULES([LIBJPEG],[libjpeg],[AS_ECHO("libjpeg flags ... $LIBJPEG_CFLAG
 
 PKG_CHECK_MODULES([LIBPNG],[libpng],[],[AC_MSG_ERROR([failed to find libpng])])
 
+AS_IF([test "x$DOS32" != "x1"], [
+	PKG_CHECK_MODULES([OGG],[ogg],[],[
+	dnl Fall back to non-pkg-config method
+		AC_CHECK_LIB([ogg], [ogg_sync_init], [], [AC_MSG_ERROR([ogg libraries not found])])
+		OGG_LIBS="-logg"
+		OGG_CFLAGS=""
+		LIBS=$push_LIBS
+	])
+
+	PKG_CHECK_MODULES([VORBIS],[vorbis],[],[
+	dnl Fall back to non-pkg-config method
+		AC_CHECK_LIB([vorbis], [vorbis_bitrate_init], [], [AC_MSG_ERROR([vorbis libraries not found])], [$OGG_LIBS])
+		AC_CHECK_HEADER([vorbis/codec.h], [], [AC_MSG_ERROR([libvorbis header files was not found])])
+		VORBIS_LIBS="-lvorbis"
+		VORBIS_CFLAGS=""
+		LIBS=$push_LIBS
+	])
+
+	PKG_CHECK_MODULES([VORBISFILE],[vorbisfile],[],[
+	dnl Fall back to non-pkg-config method
+		AC_CHECK_LIB([vorbisfile], [ov_pcm_seek_lap], [AC_DEFINE(HAVE_OV_PCM_SEEK_LAP, 1)],
+			AC_CHECK_LIB([vorbisfile], [ov_pcm_seek], [AC_DEFINE(HAVE_OV_PCM_SEEK, 1)], [AC_MSG_ERROR([vorbis libraries not found])], [$OGG_LIBS $VORBIS_LIBS])
+		)
+		AC_CHECK_HEADER([vorbis/vorbisfile.h], [], [AC_MSG_ERROR([libvorbis header files were not found])])
+		VORBISFILE_LIBS="-lvorbisfile"
+		VORBISFILE_CFLAGS=""
+		LIBS=$push_LIBS
+	])
+], [
+	OGG_CFLAGS=
+	OGG_LIBS=
+	VORBIS_CFLAGS=
+	VORBIS_LIBS=
+	VORBISFILE_CFLAGS=
+	VORBISFILE_LIBS=
+])
 AC_SUBST(OGG_CFLAGS)
 AC_SUBST(OGG_LIBS)
-PKG_CHECK_MODULES([OGG],[ogg],[],[
-dnl Fall back to non-pkg-config method
-	AC_CHECK_LIB([ogg], [ogg_sync_init], [], [AC_MSG_ERROR([ogg libraries not found])])
-	OGG_LIBS="-logg"
-	OGG_CFLAGS=""
-	LIBS=$push_LIBS
-])
-
 AC_SUBST(VORBIS_CFLAGS)
 AC_SUBST(VORBIS_LIBS)
-PKG_CHECK_MODULES([VORBIS],[vorbis],[],[
-dnl Fall back to non-pkg-config method
-	AC_CHECK_LIB([vorbis], [vorbis_bitrate_init], [], [AC_MSG_ERROR([vorbis libraries not found])], [$OGG_LIBS])
-	AC_CHECK_HEADER([vorbis/codec.h], [], [AC_MSG_ERROR([libvorbis header files was not found])])
-	VORBIS_LIBS="-lvorbis"
-	VORBIS_CFLAGS=""
-	LIBS=$push_LIBS
-])
-
 AC_SUBST(VORBISFILE_CFLAGS)
 AC_SUBST(VORBISFILE_LIBS)
-PKG_CHECK_MODULES([VORBISFILE],[vorbisfile],[],[
-dnl Fall back to non-pkg-config method
-	AC_CHECK_LIB([vorbisfile], [ov_pcm_seek_lap], [AC_DEFINE(HAVE_OV_PCM_SEEK_LAP, 1)],
-		AC_CHECK_LIB([vorbisfile], [ov_pcm_seek], [AC_DEFINE(HAVE_OV_PCM_SEEK, 1)], [AC_MSG_ERROR([vorbis libraries not found])], [$OGG_LIBS $VORBIS_LIBS])
-	)
-	AC_CHECK_HEADER([vorbis/vorbisfile.h], [], [AC_MSG_ERROR([libvorbis header files were not found])])
-	VORBISFILE_LIBS="-lvorbisfile"
-	VORBISFILE_CFLAGS=""
-	LIBS=$push_LIBS
-])
 
 AC_SUBST(HAVE_OPUS)
 AS_IF([test "x$with_opus" != "xno"],[
@@ -675,7 +732,7 @@ AS_IF([test "x$with_sdl" = "xno"],[
 	AC_DEFINE(HAVE_SDL)
 ])
 CFLAGS="$org_cflags"
-CPPFLAGS="$org_cflags"
+CPPFLAGS="$org_cppflags"
 
 AC_SUBST(FREETYPE2_LIBS)
 AC_SUBST(FREETYPE2_CFLAGS)
@@ -896,7 +953,6 @@ dnl ])
 dnl AC_LANG_POP()
 dnl This is for builtin libbinio + adplug
 # Conditionally build iostream wrappers
-
 AC_LANG_PUSH(C++)
 
 origCXX="$CXX"
@@ -958,7 +1014,6 @@ ADPLUG_INI=opltype
 AC_SUBST(VERSION, "2.3.4-beta") dnl this name is risky!!
 AC_LANG_POP()
 dnl Adplug+libbinio complete
-
 
 
 dnl SIDPLAY specifics
@@ -1036,7 +1091,7 @@ AC_CACHE_CHECK([for __builtin_expect], [resid_cv_builtin_expect],
 )
 AS_IF([test "$resid_cv_builtin_expect" = no], [HAVE_BUILTIN_EXPECT=0], [HAVE_BUILTIN_EXPECT=1])
 LIBSIDPLAYCXX="$CXX -DHAVE_CONFIG_H=1 -DSIDTUNE_NO_STDIN_LOADER=1 -DPACKAGE_NAME=\\\"sidplayfp\\\" -DVERSION=\\\"2.5.10\\\" -DPACKAGE_VERSION=\\\"2.5.10-1\\\" -DPACKAGE_URL=\\\"\\\""
-LIBSIDPLAYCXXFLAGS="$CXXFLAGS"
+LIBSIDPLAYCXXFLAGS="$CPPFLAGS $CXXFLAGS"
 dnl RUNTIME_DISPATCH makes noisy audio output, atleast with OpenCubicPlayer
 dnl AS_CASE([$target],
 dnl 	[x86_64-*],[
@@ -1062,8 +1117,15 @@ AC_SUBST(RESIDFP_BRANCH_HINTS)
 AC_SUBST(HAVE_SIDPLAYFP_BUILDERS_RESIDFP_H)
 AC_SUBST(HAVE_SIDPLAYFP_BUILDERS_RESID_H)
 
-PKG_CHECK_MODULES([LIBDISCID],[libdiscid],[],[AC_MSG_ERROR([libdiscid not found])])
-PKG_CHECK_MODULES([LIBCJSON],[libcjson],[],[AC_MSG_ERROR([libcjson not found])])
+AS_IF([test "x$DOS32" != "x1"], [
+	PKG_CHECK_MODULES([LIBDISCID],[libdiscid],[],[AC_MSG_ERROR([libdiscid not found])])
+	PKG_CHECK_MODULES([LIBCJSON],[libcjson],[],[AC_MSG_ERROR([libcjson not found])])
+], [
+	LIBDISCID_CFLAGS=
+	LIBDISCID_LIBS=
+	LIBCJSON_CFLAGS=
+	LIBCJSON_LIBS=
+])
 
 AS_IF([test "x$with_alsa" != "xno"],[
 	PKG_CHECK_MODULES([ALSA],[alsa],[],[
@@ -1071,7 +1133,8 @@ AS_IF([test "x$with_alsa" != "xno"],[
 	])
 ])
 
-PKG_CHECK_MODULES([LIBANCIENT],[libancient],[],[AC_MSG_ERROR([libancient not found])])
+AS_IF([test "x$DOS32" != "x1"], [
+	PKG_CHECK_MODULES([LIBANCIENT],[libancient],[],[AC_MSG_ERROR([libancient not found])])
 origCXX="$CXX"
 AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
 AC_SUBST(LIBANCIENT_CXX)
@@ -1087,6 +1150,15 @@ PKG_CHECK_MODULES([LIBANCIENT_SNDH],[libancient >= 2.3.0],
 		AC_DEFINE(SNDH_MUSTPROVIDE_ICE)
 		SNDH_MUSTPROVIDE_ICE=1
 	])
+], [
+	LIBANCIENT_CFLAGS=
+	LIBANCIENT_LIBS=
+	LIBANCIENT_CXX=$CXX
+	LIBANCIENT_CXXFLAGS=
+	LIBANCIENT_SNDH_CFLAGS=
+	LIBANCIENT_SNDH_LIBS=
+	SNDH_MUSTPROVIDE_ICE=
+])
 
 
 AC_SUBST(HAVE_ALSA)
@@ -1214,6 +1286,10 @@ AC_ARG_WITH([libiconv],
 	[with_libiconv=auto])
 
 found_iconv=no
+AS_IF([test "x$DOS32" = "x1"], [
+	with_libiconv=no
+	found_iconv=yes
+], [
 case $with_libiconv in
 	auto)
 		# Check in the C library first
@@ -1233,6 +1309,7 @@ case $with_libiconv in
 		AC_CHECK_LIB([iconv], [iconv_open], [ICONV_LIBS=-liconv; with_libiconv=native; found_iconv=yes])
 		;;
 esac
+])
 LIBS=$push_LIBS
 
 AS_IF([test "x$found_iconv" = "xno"], [ AC_MSG_ERROR([*** No iconv() implementation found in C library or libiconv]) ])
@@ -1260,8 +1337,10 @@ AS_IF([test "x$with_libgme" = "xno"], [
 	AC_DEFINE(HAVE_LIBGME)
 ])
 
-AC_PATH_PROG([OD], [od])
-AS_IF([test -z "$OD"], [AC_MSG_ERROR([od is needed for compiling sngplay used by playsndh])])
+AS_IF([test "x$DOS32" != "x1"], [
+	AC_PATH_PROG([OD], [od])
+	AS_IF([test -z "$OD"], [AC_MSG_ERROR([od is needed for compiling sngplay used by playsndh])])
+])
 
 AS_IF([test "x$with_update_mime_database" != "xno"],[
 	AS_IF([test "x$with_x11" != "xno" || test "x$with_sdl" != "xno" || test "x$with_sdl2" != "xno" || test "x$with_sdl3" != "xno"], [
@@ -1298,7 +1377,7 @@ AC_CONFIG_FILES(Makefile)
 AC_CONFIG_FILES(goodies/helpc/Makefile)
 AC_CONFIG_FILES(goodies/pack/Makefile)
 AC_CONFIG_FILES(ocp.ini)
-AC_CONFIG_FILES(desktop/opencubicplayer.desktop)
+AS_IF([test "x$DOS32" != "x1"], [AC_CONFIG_FILES(desktop/opencubicplayer.desktop)])
 
 AC_CONFIG_FILES(doc/opencp.dox)
 AC_CONFIG_FILES(doc/texi/faq.texi)
@@ -1311,7 +1390,7 @@ AC_CONFIG_FILES(playopl/libbinio-git/src/binio.h)
 AC_CONFIG_FILES(playopl/adplug-git/src/version.h)
 AC_CONFIG_FILES(haiku/ocp.rdef)
 
-AC_CONFIG_FILES(mingw/ocp.rc)
+AS_IF([test "x$WINDOWS" = "x1"], [AC_CONFIG_FILES(mingw/ocp.rc)])
 
 AC_OUTPUT
 

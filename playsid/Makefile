@@ -10,6 +10,9 @@ endif
 TARGETS=playsid$(LIB_SUFFIX)
 
 LIBSIDPLAYCXXFLAGS+= -I./sidplayfp-config -I./libsidplayfp-git/src
+ifeq ($(DOS32),1)
+LIBSIDPLAYCXXFLAGS+= -include $(TOPDIR)playsid/dos-threading.h
+endif
 
 LIBSIDPLAYOBJECTS= \
 	libsidplayfp-builders-sidlite-builder-sidlite-builder.o \

@@ -7,8 +7,10 @@ all: $(cdrom_so) $(pfilesel_so)
 else
 all: $(CDROM_SO) pfilesel$(LIB_SUFFIX)
 endif
+ifneq ($(DOS32),1)
 	$(MAKE) -C cdfs TOPDIR=../$(TOPDIR)
 	$(MAKE) -C modland.com TOPDIR=../$(TOPDIR)
+endif
 
 test: adbmeta-test$(EXE_SUFFIX) dirdb-test$(EXE_SUFFIX) filesystem-bzip2-test$(EXE_SUFFIX) filesystem-filehandle-cache-test$(EXE_SUFFIX) filesystem-gzip-test$(EXE_SUFFIX) filesystem-tar-test$(EXE_SUFFIX) filesystem-textfile-test$(EXE_SUFFIX) mdb-test$(EXE_SUFFIX)
 	@echo "" && echo "adbmeta-test:"                       && ./adbmeta-test
@@ -141,6 +143,13 @@ filesystem-ancient.o: filesystem-ancient.cpp \
 	filesystem-ancient.h \
 	filesystem-file-mem.h
 	$(LIBANCIENT_CXX) $< -o $@ -c $(LIBANCIENT_CXXFLAGS)
+
+filesystem-ancient-dos.o: filesystem-ancient-dos.c \
+	../config.h \
+	../types.h \
+	filesystem.h \
+	filesystem-ancient.h
+	$(CC) $< -o $@ -c
 
 filesystem-bzip2.o: filesystem-bzip2.c \
 	../config.h \

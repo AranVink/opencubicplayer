@@ -549,7 +549,7 @@ OCP_INTERNAL void wpSetPos (struct cpifaceSessionAPI_t *cpifaceSession, uint32_t
 	cpifaceSession->ringbufferAPI->reset (wavebufpos);
 }
 
-OCP_INTERNAL uint8_t wpOpenPlayer(struct ocpfilehandle_t *wavf, struct cpifaceSessionAPI_t *cpifaceSession)
+OCP_INTERNAL int wpOpenPlayer(struct ocpfilehandle_t *wavf, struct cpifaceSessionAPI_t *cpifaceSession)
 {
 	enum plrRequestFormat format;
 	uint32_t temp;

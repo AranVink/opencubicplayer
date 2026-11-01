@@ -65,6 +65,12 @@ piperun-unix.o: piperun-unix.c \
 	piperun.h
 	$(CC) $< -o $@ -c
 
+piperun-dos.o: piperun-dos.c \
+	../config.h \
+	../types.h \
+	piperun.h
+	$(CC) $< -o $@ -c
+
 piperun-windows.o: piperun-windows.c \
 	../config.h \
 	../types.h \
@@ -241,6 +247,7 @@ sets.o: sets.c sets.h \
 
 console.o: console.c \
 	../boot/console.h \
+	../boot/plinkman.h \
 	../config.h \
 	../boot/psetting.h \
 	../stuff/latin1.h \

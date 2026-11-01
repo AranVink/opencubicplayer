@@ -21,7 +21,9 @@
 #include "config.h"
 #include <assert.h>
 #include <errno.h>
+#ifndef DOS32
 #include <iconv.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,7 +104,9 @@ struct tar_instance_t
 	struct ocpfile_t            *archive_file;
 	struct ocpfilehandle_t      *archive_filehandle;
 
+#ifndef DOS32
 	iconv_t                     *iconv_handle;
+#endif
 	char                        *charset_override;  /* either NULL, or an override string */
 
 	int                          refcount;
@@ -694,7 +698,9 @@ struct ocpdir_t *tar_check (const struct ocpdirdecompressor_t *self, struct ocpf
 	iter->archive_file = file;
 
 	iter->next = tar_root;
+#ifndef DOS32
 	iter->iconv_handle = (iconv_t *)-1;
+#endif
 	tar_root = iter;
 
 	if (iter->archive_file->filesize_ready (iter->archive_file))
@@ -1327,6 +1333,7 @@ static const char *tar_get_byuser_string (struct ocpdir_t *_self)
 
 static void tar_translate_prepare (struct tar_instance_t *self)
 {
+#ifndef DOS32
 	const char *target;
 	char *temp;
 	target = self->charset_override ? self->charset_override : "UTF-8";
@@ -1351,10 +1358,14 @@ static void tar_translate_prepare (struct tar_instance_t *self)
 	{
 		self->iconv_handle = iconv_open ("UTF-8", target);
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void tar_translate_complete (struct tar_instance_t *self)
 {
+#ifndef DOS32
 	DEBUG_PRINT ("tar_translate_complete\n");
 
 	if (self->iconv_handle != (iconv_t)-1)
@@ -1362,10 +1373,20 @@ static void tar_translate_complete (struct tar_instance_t *self)
 		iconv_close (self->iconv_handle);
 		self->iconv_handle = (iconv_t)-1;
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void tar_translate (struct tar_instance_t *self, char *src, char **buffer, int *buffersize)
 {
+#ifdef DOS32
+	char *leaf = strrchr (src, '/');
+	(void)self;
+	src = leaf ? leaf + 1 : src;
+	*buffer = strdup (src);
+	*buffersize = *buffer ? strlen (*buffer) : 0;
+#else
 	char *temp;
 	size_t srclen;
 
@@ -1459,6 +1480,7 @@ ascii_no_translate:
 	*dst = 0;
 
 	DEBUG_PRINT ("%s\n", *buffer);
+#endif
 }
 
 

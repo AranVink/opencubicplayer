@@ -81,7 +81,11 @@ typedef	uint8_t		ymu8;			//  8 bits unsigned integer
 typedef	uint16_t	ymu16;			// 16 bits unsigned integer
 typedef	uint32_t	ymu32;			// 32 bits unsigned integer
 
+#ifdef __DJGPP__
+typedef	int		ymint;
+#else
 typedef	yms32		ymint;			// Native "int" for speed purpose. StSound suppose int is signed and at least 32bits. If not, change it to match to yms32
+#endif
 typedef	char		ymchar;			// 8 bits char character (used for null terminated strings)
 
 

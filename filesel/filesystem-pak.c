@@ -21,6 +21,9 @@
 #include "config.h"
 #include <assert.h>
 #include <ctype.h>
+#ifndef DOS32
+#include <iconv.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include "types.h"
@@ -1137,6 +1140,7 @@ static const char *pak_get_byuser_string (struct ocpdir_t *_self)
 
 static void pak_translate_prepare (struct pak_instance_t *self)
 {
+#ifndef DOS32
 	const char *pakget;
 	char *temp;
 	pakget = self->charset_override ? self->charset_override : "UTF-8";
@@ -1161,10 +1165,14 @@ static void pak_translate_prepare (struct pak_instance_t *self)
 	{
 		self->iconv_handle = iconv_open ("UTF-8", pakget);
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void pak_translate_complete (struct pak_instance_t *self)
 {
+#ifndef DOS32
 	DEBUG_PRINT ("pak_translate_complete\n");
 
 	if (self->iconv_handle != (iconv_t)-1)
@@ -1172,10 +1180,20 @@ static void pak_translate_complete (struct pak_instance_t *self)
 		iconv_close (self->iconv_handle);
 		self->iconv_handle = (iconv_t)-1;
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void pak_translate (struct pak_instance_t *self, char *src, char **buffer, int *buffersize)
 {
+#ifdef DOS32
+	char *leaf = strrchr (src, '/');
+	(void)self;
+	src = leaf ? leaf + 1 : src;
+	*buffer = strdup (src);
+	*buffersize = *buffer ? strlen (*buffer) : 0;
+#else
 	char *temp;
 	uint32_t srclen;
 
@@ -1253,6 +1271,7 @@ static void pak_translate (struct pak_instance_t *self, char *src, char **buffer
 	*dst = 0;
 
 	DEBUG_PRINT ("%s\n", *buffer);
+#endif
 }
 
 static void pak_set_byuser_string (struct ocpdir_t *_self, const char *byuser)

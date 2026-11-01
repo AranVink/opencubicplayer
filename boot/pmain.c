@@ -129,7 +129,7 @@ static int init_modules(int argc, char *argv[]
 	if ((ret=cmdhlp()))
 		return ret;
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(DOS32)
 	if (!geteuid())
 	{
 		if (getuid())
@@ -1170,6 +1170,7 @@ static int init_modules(int argc, char *argv[]
 	cfScreenSec=cfGetProfileString(cfConfigSec, "screensec", "screen");
 	cfSoundSec=cfGetProfileString(cfConfigSec, "soundsec", "sound");
 
+#ifndef DOS32
 	lnkLink(cfGetProfileString2(cfConfigSec, "defaultconfig", "prelink", ""));
 	lnkLink(cfGetProfileString("general", "prelink", ""));
 
@@ -1190,6 +1191,7 @@ static int init_modules(int argc, char *argv[]
 		fprintf(stderr, "could not link default objects!\n");
 		return -1;
 	}
+#endif
 
 	fprintf(stderr, "running initializers...\n");
 
@@ -1227,6 +1229,9 @@ int failcheck(signed int source, signed int filter)
 static int _bootup(int argc, char *argv[], const char *HomePath, const char *ConfigHomePath, const char *ConfigDataPath, const char *DataPath, const char *ProgramPath)
 {
 	int result;
+#ifdef DOS32
+	fprintf(stderr, "Open Cubic Player for DJGPP DOS v" VERSION ", compiled on %s, %s\n", compiledate, compiletime);
+#else
 #ifndef _WIN32
 	if (isatty(2))
 	{
@@ -1257,6 +1262,7 @@ static int _bootup(int argc, char *argv[], const char *HomePath, const char *Con
 #else
 	fprintf(stderr, "Open Cubic Player for mingw v" VERSION ", compiled on %s, %s\n", compiledate, compiletime);
 	fprintf(stderr, "Ported to Unix and mingw by Stian Skjelstad\n");
+#endif
 #endif
 
 	cfHomePath = (char *)HomePath;

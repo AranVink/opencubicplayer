@@ -1,7 +1,6 @@
 TOPDIR=../
 include $(TOPDIR)Rules.make
 
-HAVE_ADPLUG=1
 ADPLUG_CXXFLAGS+=-Ilibbinio-git/src -Iadplug-git/src
 ADPLUG_LIBS= #$(LIBBINIO_TARGETS) $(LIBADPLUG_TARGETS)
 
@@ -9,7 +8,10 @@ ifeq ($(HAVE_ADPLUG),1)
 TARGETS=playopl$(LIB_SUFFIX)
 endif
 
-LIBADPLUG_CXXFLAGS=$(ADPLUG_CXXFLAGS)-DVERSION=\"2.3.4-beta\" -Dstricmp=strcasecmp -Ilibbinio-git/src $(ADPLUG_CXX_FLAGS)
+LIBADPLUG_CXXFLAGS=$(ADPLUG_CXXFLAGS) -DVERSION=\"2.3.4-beta\" -Dstricmp=strcasecmp -Ilibbinio-git/src $(ADPLUG_CXX_FLAGS)
+ifeq ($(DOS32),1)
+LIBADPLUG_CXXFLAGS=$(ADPLUG_CXXFLAGS) -DVERSION=\"2.3.4-beta\" -Ilibbinio-git/src -include dos-compat.h
+endif
 ifeq (HAVE_GETOPT_H,1)
 LIBADPLUG_CXXFLAGS+=" -DHAVE_GETOPT_H=1"
 endif
@@ -71,6 +73,16 @@ oplconfig.o: oplconfig.cpp \
 	../stuff/poutput.h
 	$(ADPLUG_CXX) $(ADPLUG_CXXFLAGS) $< -o $@ -c
 
+oplconfig-dos.o: oplconfig-dos.cpp \
+	../config.h \
+	../types.h \
+	../boot/plinkman.h \
+	../boot/psetting.h \
+	../stuff/err.h \
+	../stuff/piperun.h \
+	oplconfig.h
+	$(ADPLUG_CXX) $(ADPLUG_CXXFLAGS) $< -o $@ -c
+
 oplKen.o: oplKen.cpp \
 	../config.h \
 	../types.h \
@@ -127,6 +139,9 @@ opltype.o: opltype.cpp \
 	$(ADPLUG_CXX) $(ADPLUG_CXXFLAGS) opltype.cpp -o $@ -c
 
 playopl_so=oplconfig.o oplchan.o oplpplay.o oplplay.o oplptrak.o ocpemu.o oplKen.o oplNuked.o oplRetroWave.o oplSatoh.o oplWoody.o opltype.o $(LIBBINIO_TARGETS) $(LIBADPLUG_TARGETS)
+ifeq ($(DOS32),1)
+playopl_so=oplconfig-dos.o oplchan.o oplpplay.o oplplay.o oplptrak.o ocpemu.o oplKen.o oplNuked.o oplSatoh.o oplWoody.o opltype.o $(LIBBINIO_TARGETS) $(LIBADPLUG_TARGETS)
+endif
 playopl$(LIB_SUFFIX): $(playopl_so)
 	$(ADPLUG_CXX) $(ADPLUG_CXXFLAGS) $(SHARED_FLAGS) $(LDFLAGS) -o $@ $^ $(ADPLUG_LIBS) $(MATH_LIBS)
 

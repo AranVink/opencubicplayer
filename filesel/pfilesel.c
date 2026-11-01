@@ -104,7 +104,9 @@
 #include "stuff/utf-16.h"
 #include "stuff/utf-8.h"
 
+#ifndef DOS32
 #include "pfilesel-charset.c"
+#endif
 
 static char fsScanDir(int pos);
 static struct modlist *currentdir=NULL;
@@ -1278,11 +1280,13 @@ int fsPreInit (const struct configAPI_t *configAPI)
 	dmCurDrive = dmFile;
 #endif
 
+#ifndef DOS32
 	if (!musicbrainz_init (configAPI)) /* needs setup */
 	{
 		fprintf (stderr, "musicbrainz failed to initialize\n");
 		return 0;
 	}
+#endif
 
 	currentdir=modlist_create();
 	playlist=modlist_create();
@@ -1412,7 +1416,9 @@ void fsClose(void)
 		playlist=NULL;
 	}
 
+#ifndef DOS32
 	musicbrainz_done();
+#endif
 
 #ifdef _WIN32
 	filesystem_windows_done ();
@@ -2152,6 +2158,7 @@ static void fsShowDirBottom80Dir (int Y, int selectd, const struct modlistentry 
 		displaystr_utf8 (Y + 0, 2, 0x07, "\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa.\xfa\xfa\xfa", plScrWidth - 2);
 	}
 
+#ifndef DOS32
 	if (mle->dir->charset_override_API)
 	{
 		const char *userstring = 0;
@@ -2175,6 +2182,9 @@ static void fsShowDirBottom80Dir (int Y, int selectd, const struct modlistentry 
 	} else {
 		displayvoid (Y + 1, 0, plScrWidth);
 	}
+#else
+	displayvoid (Y + 1, 0, plScrWidth);
+#endif
 
 	displayvoid (Y + 2, 0, plScrWidth);
 
@@ -2195,6 +2205,7 @@ static void fsShowDirBottom132Dir (int Y, int selectd, const struct modlistentry
 		displaystr_utf8 (Y + 0, 2, 0x07, "\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa\xfa.\xfa\xfa\xfa", plScrWidth - 2);
 	}
 
+#ifndef DOS32
 	if (mle->dir->charset_override_API)
 	{
 		const char *userstring = 0;
@@ -2218,6 +2229,9 @@ static void fsShowDirBottom132Dir (int Y, int selectd, const struct modlistentry
 	} else {
 		displayvoid (Y + 1, 0, plScrWidth);
 	}
+#else
+	displayvoid (Y + 1, 0, plScrWidth);
+#endif
 
 	displayvoid (Y + 2, 0, plScrWidth);
 
@@ -3683,7 +3697,11 @@ static int fsEditDirInfo(struct modlistentry *me)
 		case 0:
 			if (me->dir->charset_override_API)
 			{
+#ifndef DOS32
 				retval = fsEditCharset(me->dir);
+#else
+				retval = 0;
+#endif
 			} else {
 				retval = 0;
 			}

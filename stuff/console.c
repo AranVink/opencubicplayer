@@ -103,7 +103,7 @@ static int console_init(const struct configAPI_t *configAPI)
 		const char *driver = configAPI->GetProfileString ("CommandLine", "d", NULL);
 		if (driver)
 		{
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(DOS32)
 			if (!strcmp(driver, "curses"))
 			{
 				if (!curses_init())
@@ -370,7 +370,7 @@ static int console_init(const struct configAPI_t *configAPI)
 	}
 #endif
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(DOS32)
 	if (!curses_init())
 	{
 		console_clean=curses_done;

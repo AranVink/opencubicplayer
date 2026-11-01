@@ -22,7 +22,11 @@
 #include "config.h"
 #include <assert.h>
 #include <errno.h>
+#ifndef DOS32
 #include <iconv.h>
+#else
+#include <limits.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +35,9 @@
 #include "dirdb.h"
 #include "filesystem.h"
 #include "filesystem-zip.h"
+#ifdef DOS32
+#include "stuff/cp437.h"
+#endif
 
 #if defined(ZIP_DEBUG) || defined(ZIP_VERBOSE)
 static int do_zip_debug_print=1;
@@ -141,7 +148,9 @@ struct zip_instance_t
 	struct ocpfile_t            *archive_file;
 	struct ocpfilehandle_t      *archive_filehandle;
 
+#ifndef DOS32
 	iconv_t                     *iconv_handle;
+#endif
 	char                        *charset_override;  /* either NULL, or an override string */
 
 	int                          refcount;
@@ -1167,7 +1176,9 @@ static struct ocpdir_t *zip_check (const struct ocpdirdecompressor_t *self, stru
 	iter->Number_of_this_disk = UINT32_MAX;
 
 	iter->next = zip_root;
+#ifndef DOS32
 	iter->iconv_handle = (iconv_t *)-1;
+#endif
 	zip_root = iter;
 
 	/* filesize_ready() logic we ignore, since we must seek to the end of the file */
@@ -2363,6 +2374,7 @@ static const char *zip_get_byuser_string (struct ocpdir_t *_self)
 
 static void zip_translate_prepare (struct zip_instance_t *self)
 {
+#ifndef DOS32
 	const char *target;
 	char *temp;
 	target = self->charset_override ? self->charset_override : "CP437";
@@ -2387,10 +2399,14 @@ static void zip_translate_prepare (struct zip_instance_t *self)
 	{
 		self->iconv_handle = iconv_open ("UTF-8", target);
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void zip_translate_complete (struct zip_instance_t *self)
 {
+#ifndef DOS32
 	DEBUG_PRINT ("zip_translate_complete\n");
 
 	if (self->iconv_handle != (iconv_t)-1)
@@ -2398,10 +2414,41 @@ static void zip_translate_complete (struct zip_instance_t *self)
 		iconv_close (self->iconv_handle);
 		self->iconv_handle = (iconv_t)-1;
 	}
+#else
+	(void)self;
+#endif
 }
 
 static void zip_translate (struct zip_instance_t *self, char *src, char **buffer, int *buffersize)
 {
+#ifdef DOS32
+	char *leaf = strrchr (src, '/');
+	size_t srclen;
+	size_t output_size;
+	char *output;
+	(void)self;
+	src = leaf ? leaf + 1 : src;
+	srclen = strlen (src);
+	if (srclen > ((size_t)INT_MAX - 1) / 3)
+	{
+		free (*buffer);
+		*buffer = 0;
+		*buffersize = 0;
+		return;
+	}
+	output_size = srclen * 3 + 1;
+	output = realloc (*buffer, output_size);
+	if (!output)
+	{
+		free (*buffer);
+		*buffer = 0;
+		*buffersize = 0;
+		return;
+	}
+	*buffer = output;
+	*buffersize = (int)output_size;
+	cp437_f_to_utf8_z (src, srclen, output, output_size);
+#else
 	char *temp;
 	size_t srclen;
 
@@ -2495,6 +2542,7 @@ ascii_no_translate:
 	*dst = 0;
 
 	DEBUG_PRINT ("%s\n", *buffer);
+#endif
 }
 
 

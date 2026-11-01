@@ -63,6 +63,25 @@
 #include <windows.h>
 #endif /* _WIN32 */
 
+#ifdef DOS32
+int clock_gettime(clockid_t clk_id, struct timespec *tv)
+{
+	uclock_t ticks;
+
+	if (!tv || clk_id != CLOCK_MONOTONIC)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	ticks = uclock();
+	tv->tv_sec = ticks / UCLOCKS_PER_SEC;
+	tv->tv_nsec = (ticks % UCLOCKS_PER_SEC) * 1000000000LL / UCLOCKS_PER_SEC;
+
+	return 0;
+}
+#endif
+
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif /* HAVE_SYS_PARAM_H */

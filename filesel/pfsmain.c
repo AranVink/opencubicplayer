@@ -243,11 +243,6 @@ static int _fsMain(int argc, char *argv[])
 	stop=interfaceReturnContinue;
 	firstfile=1;
 
-#ifdef DOS32
-  /* TODO.. this can be done on xterm consoles, and proc titles*/
-	setwintitle("OpenCP");
-#endif
-
 	while (1)
 	{
 /*

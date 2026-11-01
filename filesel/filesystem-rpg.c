@@ -21,7 +21,9 @@
 #include "config.h"
 #include <assert.h>
 #include <errno.h>
+#ifndef DOS32
 #include <iconv.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

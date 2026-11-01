@@ -1,6 +1,9 @@
 TOPDIR=./
 include $(TOPDIR)Rules.make
 
+ifeq ($(DOS32),1)
+SUBDIRS=boot cpiface dev devp devw filesel help medialib playay playgmd playhvl playit playopl playsid playwav playxm playym stuff
+else
 SUBDIRS=boot cpiface dev doc devp devw filesel goodies help medialib playay playcda playflac playgmd playtimidity playhvl playit playogg playopl playsndh playqoa plugins
 ifeq ($(HAVE_MAD),1)
 SUBDIRS+=playmp2
@@ -19,6 +22,7 @@ SUBDIRS+=playwavpack
 endif
 SUBDIRS+=playsid playwav playxm playym stuff
 SUBDIRS+=mingw
+endif
 
 .PHONY: all clean subdirs $(SUBDIRS)
 
@@ -26,8 +30,10 @@ include boot/Makefile-static
 include cpiface/Makefile-static
 include devp/Makefile-static
 include filesel/Makefile-static
+ifneq ($(DOS32),1)
 include filesel/cdfs/Makefile-static
 include filesel/modland.com/Makefile-static
+endif
 include stuff/Makefile-static
 include dev/Makefile-static
 include help/Makefile-static
@@ -40,7 +46,12 @@ ifeq ($(STATIC_BUILD),1)
 libocp_so+=$(STATIC_OBJECTS)
 endif
 
+ifeq ($(DOS32),1)
+DOS_PLUGIN_MODULES=devp/devpsdl3$(LIB_SUFFIX) devw/devwmix$(LIB_SUFFIX) devw/devwnone$(LIB_SUFFIX) playay/playay$(LIB_SUFFIX) playgmd/playgmd$(LIB_SUFFIX) playhvl/playhvl$(LIB_SUFFIX) playit/playit$(LIB_SUFFIX) playopl/playopl$(LIB_SUFFIX) playsid/playsid$(LIB_SUFFIX) playwav/playwav$(LIB_SUFFIX) playxm/playxm$(LIB_SUFFIX) playym/playym$(LIB_SUFFIX)
+all: subdirs libocp$(LIB_SUFFIX) ocp$(EXE_SUFFIX)
+else
 all: subdirs ocp$(EXE_SUFFIX) ocp.hlp libocp$(LIB_SUFFIX)
+endif
 
 install:
 	mkdir -p "$(DESTDIR)$(DOCDIR)"
@@ -148,8 +159,21 @@ OCP_OBJECTS+=boot/kickload.o
 ifeq ($(WINDOWS),1)
 OCP_OBJECTS+=boot/utf-8.o boot/utf-16.o
 endif
+ifeq ($(DOS32),1)
+ocp$(EXE_SUFFIX): boot libocp$(LIB_SUFFIX) subdirs
+	for module in libocp$(LIB_SUFFIX) $(DOS_PLUGIN_MODULES); do \
+		$(host)-objcopy --localize-symbol=__environ "$$module" "$$module.tmp" || exit 1; \
+		mv "$$module.tmp" "$$module" || exit 1; \
+	done
+	$(host)-objcopy --redefine-sym _mod=_gmd_module playgmd/playgmd$(LIB_SUFFIX) playgmd/playgmd$(LIB_SUFFIX).tmp
+	mv playgmd/playgmd$(LIB_SUFFIX).tmp playgmd/playgmd$(LIB_SUFFIX)
+	$(host)-objcopy --redefine-sym _mod=_xm_module playxm/playxm$(LIB_SUFFIX) playxm/playxm$(LIB_SUFFIX).tmp
+	mv playxm/playxm$(LIB_SUFFIX).tmp playxm/playxm$(LIB_SUFFIX)
+	$(CXX) $(LDFLAGS) -o $@ boot/kickload.o libocp$(LIB_SUFFIX) $(DOS_PLUGIN_MODULES) boot/plugin-list-end.o $(SDL3_LIBS) $(MATH_LIBS) -lz -lbz2
+else
 ocp$(EXE_SUFFIX): boot
 	$(CC) $(LDFLAGS) -o $@ $(OCP_OBJECTS) @DL_LIBS@ @EFENCE_LIBS@ @DUMA_LIBS@
+endif
 ifeq ($(HAIKU),1)
 	rc -o haiku/ocp.rsrc haiku/ocp.rdef
 	xres -o $@ haiku/ocp.rsrc

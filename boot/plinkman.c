@@ -45,7 +45,7 @@
 # include <fileapi.h>
 # include <libloaderapi.h>
 # include <windows.h>
-#else
+#elif !defined(DOS32)
 # include <dlfcn.h>
 #endif
 #include <stdio.h>
@@ -122,6 +122,7 @@ static int lnkAppend (char *file, void *handle, uint32_t size, const struct link
 	return loadlist[i].id;
 }
 
+#ifndef DOS32
 static int _lnkDoLoad(char *file)
 {
 	int i;
@@ -235,6 +236,14 @@ static int _lnkDoLoad(char *file)
 
 	return lnkAppend (file, handle, size, info);
 }
+#else
+static int _lnkDoLoad(char *file)
+{
+	fprintf(stderr, "Dynamic plugin loading is not supported in DJGPP builds\n");
+	free(file);
+	return -1;
+}
+#endif
 
 static int lnkDoLoad(const char *file)
 {
@@ -479,8 +488,10 @@ void lnkFree(const int id)
 
 #ifdef SUPPORT_STATIC_PLUGINS
 
-/* special symbols maintained by linkers, marking the boundaries of sections */
-#ifdef __APPLE__
+#ifdef DOS32
+const struct linkinfostruct __ocp_plugin_list_begin
+	__attribute__ ((section (".data.plugin_list"), aligned (16), used)) = {0};
+#elif defined(__APPLE__)
 extern uint8_t section$start$__DATA$plugin_list[];
 extern uint8_t section$end$__DATA$plugin_list[];
 #else
@@ -490,7 +501,10 @@ extern uint8_t __stop_plugin_list[];
 
 static void lnkLoadStatics(void)
 {
-#ifdef __APPLE__
+#ifdef DOS32
+	const struct linkinfostruct *iterator = &__ocp_plugin_list_begin + 1;
+	const struct linkinfostruct *end      = &__ocp_plugin_list_end;
+#elif defined(__APPLE__)
 	const struct linkinfostruct *iterator = (struct linkinfostruct *)section$start$__DATA$plugin_list;
 	const struct linkinfostruct *end      = (struct linkinfostruct *)section$end$__DATA$plugin_list;
 #else
@@ -532,19 +546,27 @@ void *lnkGetSymbol(const int id, const char *name)
 	int i;
 	if (!id)
 	{
+#ifndef DOS32
 		void *retval;
+#endif
 		for (i=loadlist_n-1;i>=0;i--)
-#ifdef _WIN32
+#ifdef DOS32
+			if (!strcmp(name, "dllextinfo"))
+				return (void *)loadlist[i].info;
+#elif defined(_WIN32)
 			if ((retval = GetProcAddress (loadlist[i].handle, name)))
 #else
 			if ((retval = dlsym (loadlist[i].handle, name)))
 #endif
-
+#ifndef DOS32
 				return retval;
+#endif
 	} else
 		for (i=loadlist_n-1;i>=0;i--)
 			if (loadlist[i].id==id)
-#ifdef _WIN32
+#ifdef DOS32
+				return !strcmp(name, "dllextinfo") ? (void *)loadlist[i].info : NULL;
+#elif defined(_WIN32)
 				return GetProcAddress (loadlist[i].handle, name);
 #else
 				return dlsym (loadlist[i].handle, name);
@@ -628,4 +650,3 @@ void lnkCloseAll (void)
 		if (loadlist[i].info->LateClose)
 			loadlist[i].info->LateClose();
 }
-

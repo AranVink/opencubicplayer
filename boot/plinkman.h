@@ -62,7 +62,11 @@ struct PluginCloseAPI_t
 	void (*filesystem_setup_unregister_file) (struct ocpfile_t *file);
 };
 
+#ifdef DOS32
+struct __attribute__ ((aligned (16))) linkinfostruct
+#else
 struct __attribute__ ((aligned (64))) linkinfostruct
+#endif
 {
 	const char *name;
 	const char *desc;
@@ -77,7 +81,15 @@ struct __attribute__ ((aligned (64))) linkinfostruct
 	void (*PluginClose)(struct PluginCloseAPI_t *API);
 	void (*Close)(void);
 	void (*LateClose)(void); /* low priority Close */
+#ifdef DOS32
+	uint8_t dos_padding[16];
+#endif
 };
+
+#ifdef DOS32
+extern const struct linkinfostruct __ocp_plugin_list_begin;
+extern const struct linkinfostruct __ocp_plugin_list_end;
+#endif
 
 struct dll_handle
 {
@@ -108,7 +120,13 @@ int lnkPluginInitAll (struct PluginInitAPI_t *API);
 void lnkPluginCloseAll (struct PluginCloseAPI_t *API);
 void lnkCloseAll (void);
 
-#ifdef SUPPORT_STATIC_PLUGINS
+#if defined(SUPPORT_STATIC_PLUGINS) && defined(DOS32)
+# ifdef __APPLE__
+#  define DLLEXTINFO_BEGIN_PREFIX static const __attribute__ ((section ("__DATA,plugin_list"))) __attribute__ ((used))
+# else
+#  define DLLEXTINFO_BEGIN_PREFIX static const __attribute__ ((section (".data.plugin_list"))) __attribute__ ((used))
+# endif
+#elif defined(SUPPORT_STATIC_PLUGINS)
 # ifdef __APPLE__
 #  define DLLEXTINFO_BEGIN_PREFIX const __attribute__ ((section ("__DATA,plugin_list"))) __attribute__ ((used))
 # else
@@ -118,7 +136,9 @@ void lnkCloseAll (void);
 # define DLLEXTINFO_BEGIN_PREFIX
 #endif
 
-#ifdef STATIC_CORE
+#if defined(STATIC_CORE) && defined(DOS32)
+# define DLLEXTINFO_CORE_PREFIX static const __attribute__ ((section (".data.plugin_list"))) __attribute__ ((used))
+#elif defined(STATIC_CORE)
 # ifdef __APPLE__
 #  define DLLEXTINFO_CORE_PREFIX  static const __attribute__ ((section ("__DATA,plugin_list"))) __attribute__ ((used))
 # else
@@ -128,8 +148,22 @@ void lnkCloseAll (void);
 # define DLLEXTINFO_CORE_PREFIX const
 #endif
 
-#define DLLEXTINFO_DRIVER_PREFIX       const
-#define DLLEXTINFO_PLAYBACK_PREFIX     const
-#define DLLEXTINFO_PLAYBACK_PREFIX_CPP /* C++, const implies static */
+#ifdef DOS32
+# ifdef __APPLE__
+#  define DLLEXTINFO_DRIVER_PREFIX     static const __attribute__ ((section ("__DATA,plugin_list"))) __attribute__ ((used))
+#  define DLLEXTINFO_PLAYBACK_PREFIX   static const __attribute__ ((section ("__DATA,plugin_list"))) __attribute__ ((used))
+# else
+#  define DLLEXTINFO_DRIVER_PREFIX     static const __attribute__ ((section (".data.plugin_list"))) __attribute__ ((used))
+#  define DLLEXTINFO_PLAYBACK_PREFIX   static const __attribute__ ((section (".data.plugin_list"))) __attribute__ ((used))
+# endif
+#else
+# define DLLEXTINFO_DRIVER_PREFIX      const
+# define DLLEXTINFO_PLAYBACK_PREFIX    const
+#endif
+#ifdef DOS32
+# define DLLEXTINFO_PLAYBACK_PREFIX_CPP DLLEXTINFO_PLAYBACK_PREFIX
+#else
+# define DLLEXTINFO_PLAYBACK_PREFIX_CPP /* C++, const implies static */
+#endif
 
 #endif

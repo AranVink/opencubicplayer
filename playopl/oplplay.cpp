@@ -23,6 +23,7 @@
 #include "libbinio-git/src/binstr.h"
 #include <cstdlib>
 #include <string.h>
+#include <strings.h>
 #include "adplug-git/src/adplug.h"
 #include "adplug-git/src/fprovide.h"
 #include "types.h"
@@ -44,9 +45,19 @@ extern "C"
 #include "ocpemu.h"
 #include "oplKen.h"
 #include "oplNuked.h"
+#ifndef __DJGPP__
 #include "oplRetroWave.h"
+#endif
 #include "oplSatoh.h"
 #include "oplWoody.h"
+
+#ifdef __DJGPP__
+extern "C"
+{
+char *strdup(const char *);
+int strcasecmp(const char *, const char *);
+}
+#endif
 
 #define ROW_BUFFERS 100
 
@@ -334,7 +345,9 @@ OCP_INTERNAL int oplOpenPlayer (const char *filename /* needed for detection */,
 	if (!strcasecmp (str, "ken"))
 	{
 		opl = new Cocpemu(new oplKen(oplRate), oplRate, 0);
-	} else if (!strcasecmp (str, "retrowave"))
+	}
+#ifndef __DJGPP__
+	else if (!strcasecmp (str, "retrowave"))
 	{
 		char *device = opl_config_retrowave_device (cpifaceSession->PipeProcess, cpifaceSession->configAPI);
 		if (!device)
@@ -354,7 +367,9 @@ OCP_INTERNAL int oplOpenPlayer (const char *filename /* needed for detection */,
 			return errFileOpen;
 		}
 		opl = new Cocpemu(o, oplRate, 1);
-	} else if (!strcasecmp (str, "satoh"))
+	}
+#endif
+	else if (!strcasecmp (str, "satoh"))
 	{
 		opl = new Cocpemu(new oplSatoh(oplRate), oplRate, 0);
 	} else if (!strcasecmp (str, "woody"))

@@ -73,6 +73,28 @@ struct unix_ocpfile_t
 	uint64_t filesize;
 };
 
+#ifdef DOS32
+static void unix_fixup_dos_path (char *path)
+{
+	char *iter;
+
+	if ((path[0] == '/') &&
+	    ((path[1] >= 'a' && path[1] <= 'z') || (path[1] >= 'A' && path[1] <= 'Z')) &&
+	    (path[2] == ':'))
+	{
+		memmove (path, path + 1, strlen (path));
+	}
+
+	for (iter = path; *iter; iter++)
+	{
+		if (*iter == '/')
+		{
+			*iter = '\\';
+		}
+	}
+}
+#endif
+
 static void unix_dir_ref (struct ocpdir_t *_s);
 
 static void unix_dir_unref (struct ocpdir_t *_s);
@@ -166,6 +188,9 @@ static ocpdirhandle_pt unix_dir_readdir_start (struct ocpdir_t *_s,
 		fprintf (stderr, "[filesystem unix readdir_start]: dirdbGetFullname_malloc () failed #1\n");
 		return 0;
 	}
+#ifdef DOS32
+	unix_fixup_dos_path (path);
+#endif
 
 	retval = malloc (sizeof (*retval));
 	if (!retval)
@@ -239,6 +264,12 @@ again:
 		char *path;
 
 		dirdbGetFullname_malloc (dirdb_ref, &path, DIRDB_FULLNAME_NODRIVE);
+#ifdef DOS32
+		if (path)
+		{
+			unix_fixup_dos_path (path);
+		}
+#endif
 
 		if (lstat (path, &lst))
 		{
@@ -292,6 +323,24 @@ static struct ocpdir_t *unix_dir_readdir_dir (struct ocpdir_t *_s, uint32_t dird
 	char *path;
 	struct stat st;
 	struct stat lst;
+#ifdef DOS32
+	uint32_t parent = dirdbGetParentAndRef (dirdb_ref, dirdb_use_drive_resolve);
+
+	if (parent == dmFile->basedir->dirdb_ref)
+	{
+		const char *name = 0;
+		dirdbGetName_internalstr (dirdb_ref, &name);
+		if (name && (strlen (name) == 2) &&
+		    ((name[0] >= 'a' && name[0] <= 'z') || (name[0] >= 'A' && name[0] <= 'Z')) &&
+		    (name[1] == ':'))
+		{
+			/* DOS drive roots are represented below file: and need no lstat lookup. */
+			dirdbUnref (parent, dirdb_use_drive_resolve);
+			return unix_dir_steal (&s->head, dirdbRef (dirdb_ref, dirdb_use_dir));
+		}
+	}
+	dirdbUnref (parent, dirdb_use_drive_resolve);
+#endif
 
 	dirdbGetFullname_malloc (dirdb_ref, &path, DIRDB_FULLNAME_NODRIVE|DIRDB_FULLNAME_ENDSLASH);
 	if (!path)
@@ -299,9 +348,15 @@ static struct ocpdir_t *unix_dir_readdir_dir (struct ocpdir_t *_s, uint32_t dird
 		fprintf (stderr, "[filesystem unix readdir_dir]: dirdbGetFullname_malloc () failed\n");
 		return 0;
 	}
+#ifdef DOS32
+	unix_fixup_dos_path (path);
+#endif
 
 	if (lstat (path, &lst))
 	{
+#ifdef DOS32
+		fprintf (stderr, "[filesystem DOS readdir_dir] lstat(\"%s\") failed: %s\n", path, strerror (errno));
+#endif
 		free (path);
 		return 0;
 	}
@@ -342,6 +397,9 @@ static struct ocpfile_t *unix_dir_readdir_file (struct ocpdir_t *_s, uint32_t di
 		fprintf (stderr, "[filesystem unix readdir_file]: dirdbGetFullname_malloc () failed\n");
 		return 0;
 	}
+#ifdef DOS32
+	unix_fixup_dos_path (path);
+#endif
 
 	if (lstat (path, &lst))
 	{
@@ -400,8 +458,18 @@ static struct ocpfilehandle_t *unix_file_open (struct ocpfile_t *_s)
 	struct unix_ocpfilehandle_t *r;
 
 	dirdbGetFullname_malloc (s->head.dirdb_ref, &path, DIRDB_FULLNAME_NODRIVE);
+#ifdef DOS32
+	if (path)
+	{
+		unix_fixup_dos_path (path);
+	}
+#endif
 
-	fd = open (path, O_RDONLY);
+	fd = open (path, O_RDONLY
+#ifdef DOS32
+	           | O_BINARY
+#endif
+	);
 	if (fd < 0)
 	{
 		//fprintf (stderr, "[filesystem] unable to open \"%s\": %s\n", path, strerror (errno));
@@ -657,8 +725,29 @@ static struct ocpdir_t *filesystem_unix_resolve_dir (const char *path)
 	uint32_t dirdb_ref;
 	struct dmDrive *drive = 0;
 	struct ocpdir_t *dir = 0;
+#ifdef DOS32
+	char *dos_path = strdup (path);
+	char *iter;
+
+	if (!dos_path)
+	{
+		fprintf (stderr, "filesystem_unix_resolve_dir(): strdup() failed\n");
+		return 0;
+	}
+	for (iter = dos_path; *iter; iter++)
+	{
+		if (*iter == '\\')
+		{
+			*iter = '/';
+		}
+	}
+	path = dos_path;
+#endif
 
 	dirdb_ref = dirdbResolvePathWithBaseAndRef(dmFile->basedir->dirdb_ref, path, DIRDB_RESOLVE_NODRIVE, dirdb_use_dir);
+#ifdef DOS32
+	free (dos_path);
+#endif
 	if (!filesystem_resolve_dirdb_dir (dirdb_ref, &drive, &dir))
 	{
 		if (drive != dmFile)

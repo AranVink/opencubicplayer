@@ -14,6 +14,18 @@
 #include <stdint.h>
 #endif
 
+#ifdef DOS32
+#include <time.h>
+typedef int clockid_t;
+struct timespec
+{
+	time_t tv_sec;
+	long tv_nsec;
+};
+#define CLOCK_MONOTONIC 1
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+#endif
+
 #ifdef HAVE_SYS_CDEFS_H
 #include <sys/cdefs.h>
 #endif

@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_mutex.h>
 #include <SDL3/SDL_timer.h>
@@ -62,6 +63,14 @@ static const struct plrDevAPI_t *sdlInit (const struct plrDriver_t *driver, cons
 		SDL_ClearError();
 		return 0;
 	}
+
+#ifdef DOS32
+	if (!SDL_GetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES) &&
+	    !SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "2048"))
+	{
+		fprintf(stderr, "[SDL] Failed to set DOS audio buffer size: %s\n", SDL_GetError());
+	}
+#endif
 
 #ifdef SDL3_DEBUG
 	fprintf(stderr, "[SDL] Audio drivers:\n");
